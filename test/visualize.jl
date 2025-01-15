@@ -1,0 +1,48 @@
+include("../nn.jl")
+using Printf
+function visualize_net(net::Net, x::Vector{Float64})
+    """
+    Visualize the neural network with activations, weights, and biases.
+    """
+    # Forward pass to compute activations
+    forward!(net, x)
+
+    # Function to format a vector for display
+    function format_vector(v)
+        return [@sprintf("% .2f", elem) for elem in v]
+    end
+
+    # Function to draw a single layer
+    function draw_layer(layer::Layer, index::Int)
+        println("Layer $index")
+
+        println("  Activations:")
+        println("  [" * join(format_vector(layer.a), ", ") * "]")
+
+        println("  Weights:")
+        for row in eachrow(layer.w)
+            println("  [" * join(format_vector(row), ", ") * "]")
+        end
+
+        println("  Biases:")
+        println("  [" * join(format_vector(layer.b), ", ") * "]")
+
+        println("  Outputs:")
+        println("  [" * join(format_vector(layer.z), ", ") * "]")
+    end
+
+    println("Input:")
+    println("[" * join(format_vector(x), ", ") * "]")
+    println("\n")
+
+    # Draw each layer
+    for (i, layer) in enumerate(net.layers)
+        draw_layer(layer, i)
+        println("\n")
+    end
+
+    # Draw the output layer explicitly (redundant in this architecture but for clarity)
+    println("Output Layer:")
+    println("  Activations:")
+    println("  [" * join(format_vector(net.output.a), ", ") * "]")
+end
