@@ -4,8 +4,20 @@ softmax(x) = exp.(x) ./ sum(exp.(x))
 relu(x) = max.(0, x)
 relu′(x) = x .> 0
 
+leaky_relu(x) = max.(0.01 * x, x)
+leaky_relu′(x) = broadcast((x) -> x > 0 ? 1.0 : 0.01, x)
+
+sigmoid(x) = 1 ./ (1 .+ exp.(-x))
+sigmoid′(x) = sigmoid(x) .* (1 .- sigmoid(x))
+
+
+## LOSS FUNCTIONS
 mse_loss(ŷ, y) = sum((ŷ - y).^2)
 mse_loss′(ŷ, y) = 2 * (ŷ - y)
+
+
+cse_loss(ŷ, y) = -sum(y .* log.(ŷ))  #ŷ is output of softmax function. y is one hot encoded
+cse_loss′(ŷ, y) = ŷ - y #IF USING SOFTMAX. ∂L∂ŷ = ŷ - y
 
 
 
@@ -25,7 +37,8 @@ end
 function Layer(in_features::Int, out_features::Int, σ::Function, σ′::Function)
     a = zeros(out_features)
     z = zeros(out_features)
-    w = randn(out_features, in_features)
+
+    w = randn(out_features, in_features) * sqrt(2 / (in_features + out_features))
     b = zeros(out_features)
 
     Layer(a, z, w, b, in_features, out_features, σ, σ′)
@@ -56,7 +69,7 @@ function forward!(net::Net, x::Array{Float64})
     for l in eachindex(net.layers)
         layer_input = (l == 1) ? x : net.layers[l - 1].a
         net.layers[l].z = net.layers[l].w * layer_input + net.layers[l].b
-        net.layers[l].a = net.layers[l].σ.(net.layers[l].z)
+        net.layers[l].a = net.layers[l].σ(net.layers[l].z)
     end
     net.output.a
 end
@@ -69,79 +82,26 @@ function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::
     ∂ŷ∂z = net.output.σ′(net.output.z)
     ∂z∂w = net.layers[end - 1].a'
 
-    partial_∇ = ∂L∂ŷ .* ∂ŷ∂z 
+    ∂L∂z = ∂L∂ŷ .* ∂ŷ∂z 
 
-    net.output.w -= α * (partial_∇ * ∂z∂w  +  λ * net.output.w)
-    net.output.b -= α * partial_∇
+    net.output.w -= α * (∂L∂z * ∂z∂w  +  λ * net.output.w)
+    net.output.b -= α * ∂L∂z
 
-    ## Backpropagate through the hidden layers
     for l in (length(net.layers) - 1):-1:1
-
-        # Gradients for the current layer 
-        # ∂L∂a = ∑(∂z∂a_l * ∂L∂a_j * ∂aj∂z_j)  
-        # REMEMBER: [∂a∂z_j * ∂z∂a_j stored in partial_∇]
-        ∂L∂a = net.layers[l + 1].w' * partial_∇  #sum handled by matrix *
+        # ∂L∂a = ∑(∂z∂a_l * ∂L∂a_j * ∂aj∂z_j) REMEMBER: [∂a∂z_j * ∂L∂a_j stored in ∂L∂z]
+        ∂L∂a = net.layers[l + 1].w' * ∂L∂z  #sum handled by matrix *
         ∂a∂z = net.layers[l].σ′(net.layers[l].z)  
-        partial_∇ = ∂L∂a .* ∂a∂z 
+        ∂L∂z = ∂L∂a .* ∂a∂z 
 
         layer_input = (l == 1) ? x : net.layers[l - 1].a
         ∂z∂w = layer_input'  # Input to the current layer
 
-        net.layers[l].w -= α * (partial_∇ * ∂z∂w + λ * net.layers[l].w)
-        net.layers[l].b -= α * partial_∇
+        net.layers[l].w -= α * (∂L∂z * ∂z∂w + λ * net.layers[l].w)
+        net.layers[l].b -= α * ∂L∂z
     end
 end
-
-
 
 function step!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::Float64)
     forward!(net, x)
     back!(net, x, y, α, λ)
-end
-
-function visualize_net(net::Net, x::Vector{Float64})
-    """
-    Visualize the neural network with activations, weights, and biases.
-    """
-    # Forward pass to compute activations
-    forward!(net, x)
-
-    # Function to format a vector for display
-    function format_vector(v)
-        return [@sprintf("% .2f", elem) for elem in v]
-    end
-
-    # Function to draw a single layer
-    function draw_layer(layer::Layer, index::Int)
-        println("Layer $index")
-
-        println("  Activations:")
-        println("  [" * join(format_vector(layer.a), ", ") * "]")
-
-        println("  Weights:")
-        for row in eachrow(layer.w)
-            println("  [" * join(format_vector(row), ", ") * "]")
-        end
-
-        println("  Biases:")
-        println("  [" * join(format_vector(layer.b), ", ") * "]")
-
-        println("  Outputs:")
-        println("  [" * join(format_vector(layer.z), ", ") * "]")
-    end
-
-    println("Input:")
-    println("[" * join(format_vector(x), ", ") * "]")
-    println("\n")
-
-    # Draw each layer
-    for (i, layer) in enumerate(net.layers)
-        draw_layer(layer, i)
-        println("\n")
-    end
-
-    # Draw the output layer explicitly (redundant in this architecture but for clarity)
-    println("Output Layer:")
-    println("  Activations:")
-    println("  [" * join(format_vector(net.output.a), ", ") * "]")
 end
