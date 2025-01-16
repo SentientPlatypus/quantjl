@@ -2,8 +2,8 @@
 using Test
 using Random
 using Printf
+using UnicodePlots
 include("../nn.jl")  # Assuming your neural network code is in a module named NN
-include("visualize.jl")
 
 
 
@@ -55,31 +55,40 @@ end
     end
 end
 
-@testset "Visualize Neural Network Test" begin
-    x, y, net = CNOT(1)
-    visualize_net(net, x[1, :])
-end
-
 # Test the neural network on the CNOT problem
 @testset "Neural Network AND Test" begin
     x, y, net = AND(1)
     α = 0.001
     λ = 0.0
 
+    loss_history = []
+    epoch_history = []
+    
+
     for epoch in 1:100000
         for i in 1:size(x, 1)
             step!(net, x[i, :], y[i, :], α, λ)
         end
-        if epoch % 1000 == 0
+        if epoch % 100 == 0
             loss = 0.0
             for j in 1:size(x, 1)
                 forward!(net, x[j, :])
                 loss += net.L(net.output.a, y[j, :])
             end
-            println("Epoch: $epoch, Loss: $loss")
+            push!(loss_history, loss)
+            push!(epoch_history, epoch)
         end
     end
 
+
+    plt = UnicodePlots.lineplot(
+        epoch_history, 
+        loss_history, 
+        xlabel="Epoch", 
+        ylabel="Loss", 
+        title="AND Loss",
+        width=100)
+    display(plt)
 
 
     for i in 1:size(x, 1)

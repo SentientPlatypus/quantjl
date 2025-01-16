@@ -1,4 +1,5 @@
 include("../nn.jl")
+include("nn.jl")
 using Printf
 function visualize_net(net::Net, x::Vector{Float64})
     """
@@ -45,11 +46,4 @@ function visualize_net(net::Net, x::Vector{Float64})
     println("Output Layer:")
     println("  Activations:")
     println("  [" * join(format_vector(net.output.a), ", ") * "]")
-end
-
-
-
-@testset "Visualize Neural Network Test" begin
-    x, y, net = CNOT(1)
-    visualize_net(net, x[1, :])
 end

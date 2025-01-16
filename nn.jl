@@ -51,14 +51,9 @@ mutable struct Net
     L′::Function
 end
 
-function Net(dims::Array{Int, 2}, L::Function, L′::Function)
-    Net([Layer(dim...) for dim in dims], L, L′)
-end
-
 function Net(layers::Array{Layer}, L::Function, L′::Function)
     Net(layers, layers[end], L, L′)
 end
-
 
 
 function forward!(net::Net, x::Array{Float64})
@@ -71,7 +66,7 @@ function forward!(net::Net, x::Array{Float64})
         net.layers[l].z = net.layers[l].w * layer_input + net.layers[l].b
         net.layers[l].a = net.layers[l].σ(net.layers[l].z)
     end
-    net.output.a
+    x, net.output.a
 end
 
 function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::Float64)
