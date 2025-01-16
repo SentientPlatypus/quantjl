@@ -14,8 +14,36 @@ function CNOT(seed::Int)
 
     Random.seed!(seed)
     layers = [
-        Layer(2, 2, leaky_relu, leaky_relu′),  # Input layer
-        Layer(2, 2, leaky_relu, leaky_relu′)   # Output layer
+        Layer(2, 8, leaky_relu, leaky_relu′),  # Input layer
+        Layer(8, 2, leaky_relu, leaky_relu′)   # Output layer
+    ]
+
+    return x, y, Net(layers, mse_loss, mse_loss′)
+end
+
+# Define a function with 3 outputs
+function ThreeOutput(seed::Int)
+    x = [0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0]  # Input data
+    y = [0.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0; 0.0 0.0 0.0]  # Output data (3 outputs)
+
+    Random.seed!(seed)
+    layers = [
+        Layer(2, 4, leaky_relu, leaky_relu′),  # Input layer to hidden layer with 4 neurons
+        Layer(4, 3, leaky_relu, leaky_relu′)   # Hidden layer to output layer with 3 outputs
+    ]
+
+    return x, y, Net(layers, mse_loss, mse_loss′)
+end
+
+
+function BinOneHot(seed::Int)
+    x = [0.0 0.0; 0.0 1.0; 1.0 0.0; 1.0 1.0]  # Input data
+    y = [1.0 0.0 0.0 0.0; 0.0 1.0 0.0 0.0; 0.0 0.0 1.0 0.0; 0.0 0.0 0.0 1.0]  # Output data (3 outputs)
+
+    Random.seed!(seed)
+    layers = [
+        Layer(2, 6, leaky_relu, leaky_relu′),  # Input layer to hidden layer with 4 neurons
+        Layer(6, 4, leaky_relu, leaky_relu′)   # Hidden layer to output layer with 3 outputs
     ]
 
     return x, y, Net(layers, mse_loss, mse_loss′)
@@ -96,5 +124,132 @@ end
         @test isapprox(net.output.a, y[i, :], atol=0.2)
     end
 end
+
+
+@testset "Neural Network 3 output Test" begin
+    x, y, net = ThreeOutput(1)
+    α = 0.0001
+    λ = 0.0
+
+    loss_history = []
+    epoch_history = []
+    
+
+    for epoch in 1:100000
+        for i in 1:size(x, 1)
+            step!(net, x[i, :], y[i, :], α, λ)
+        end
+        if epoch % 100 == 0
+            loss = 0.0
+            for j in 1:size(x, 1)
+                forward!(net, x[j, :])
+                loss += net.L(net.output.a, y[j, :])
+            end
+            push!(loss_history, loss)
+            push!(epoch_history, epoch)
+        end
+    end
+
+
+    plt = UnicodePlots.lineplot(
+        epoch_history, 
+        loss_history, 
+        xlabel="Epoch", 
+        ylabel="Loss", 
+        title="3 Output Loss",
+        width=100)
+    display(plt)
+
+
+    for i in 1:size(x, 1)
+        println(forward!(net, x[i, :]))
+        @test isapprox(net.output.a, y[i, :], atol=0.2)
+    end
+end
+
+@testset "Neural Network binary one hot Test" begin
+    x, y, net = BinOneHot(1)
+    α = 0.0001
+    λ = 0.0
+
+    loss_history = []
+    epoch_history = []
+    
+
+    for epoch in 1:100000
+        for i in 1:size(x, 1)
+            step!(net, x[i, :], y[i, :], α, λ)
+        end
+        if epoch % 100 == 0
+            loss = 0.0
+            for j in 1:size(x, 1)
+                forward!(net, x[j, :])
+                loss += net.L(net.output.a, y[j, :])
+            end
+            push!(loss_history, loss)
+            push!(epoch_history, epoch)
+        end
+    end
+
+
+    plt = UnicodePlots.lineplot(
+        epoch_history, 
+        loss_history, 
+        xlabel="Epoch", 
+        ylabel="Loss", 
+        title="Binary One Hot Loss",
+        width=100)
+    display(plt)
+
+
+    for i in 1:size(x, 1)
+        println(forward!(net, x[i, :]))
+        @test isapprox(net.output.a, y[i, :], atol=0.2)
+    end
+end
+
+
+@testset "Neural Network CNOT Test" begin
+    x, y, net = CNOT(1)
+    α = 0.0001
+    λ = 0.0
+
+    loss_history = []
+    epoch_history = []
+    
+
+    for epoch in 1:100000
+        for i in 1:size(x, 1)
+            step!(net, x[i, :], y[i, :], α, λ)
+        end
+        if epoch % 100 == 0
+            loss = 0.0
+            for j in 1:size(x, 1)
+                forward!(net, x[j, :])
+                loss += net.L(net.output.a, y[j, :])
+            end
+            push!(loss_history, loss)
+            push!(epoch_history, epoch)
+        end
+    end
+
+
+    plt = UnicodePlots.lineplot(
+        epoch_history, 
+        loss_history, 
+        xlabel="Epoch", 
+        ylabel="Loss", 
+        title="CNOT Loss",
+        width=100)
+    display(plt)
+
+
+    for i in 1:size(x, 1)
+        println(forward!(net, x[i, :]))
+        @test isapprox(net.output.a, y[i, :], atol=0.2)
+    end
+end
+
+
 
 
