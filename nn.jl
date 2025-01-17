@@ -60,13 +60,16 @@ function forward!(net::Net, x::Array{Float64})
     """feedforwards the net, and returns the output activatiosns"""
     @assert length(x) == net.layers[1].in_features
 
-    ##First Layer
     for l in eachindex(net.layers)
         layer_input = (l == 1) ? x : net.layers[l - 1].a
         net.layers[l].z = net.layers[l].w * layer_input + net.layers[l].b
         net.layers[l].a = net.layers[l].σ(net.layers[l].z)
     end
-    x, net.output.a
+    net.output.a
+end
+
+function (Net::Net)(x::Array{Float64})
+    forward!(Net, x)
 end
 
 function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::Float64)
