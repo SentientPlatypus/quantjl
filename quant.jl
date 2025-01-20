@@ -16,7 +16,7 @@ mutable struct Quant
     π_target::Net          # Target policy network 
     Q_target::Net          # Target Q-value network 
 
-    replay_buffer::Vector{Tuple{Array{Float64, 1}, Int, Float64, Array{Float64, 1}}}  # (state, action, reward, next_state)
+    replay_buffer::Vector{Tuple{Array{Float64, 1}, Float64, Float64, Array{Float64, 1}}}  # (state, action, reward, next_state)
     γ::Float64             # Discount factor 
     τ::Float64             # Target network update rate 
 end
@@ -43,7 +43,7 @@ end
 function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
     """Train the Quant agent using a minibatch from the replay buffer"""
     if length(quant.replay_buffer) < batch_size
-        return  # Not enough data to train
+        return  
     end
 
     # Sample a minibatch
@@ -51,20 +51,22 @@ function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
 
     for (s, a, r, s′) in minibatch
         # Compute target Q-value: y = r + γ Q̂(s', π_target(s'))
-
         a′ = quant.π_target(s′)  
 
-        Q_target_value = quant.Q_target(vcat(s′, [a′]))
+        Q_target_value = quant.Q_target(vcat(s′, a′))
 
-        y = r + quant.γ * Q_target_value
+        y = r .+ quant.γ * Q_target_value
 
         # Train critic: Q̂(s, a) → y
-        Q_current = quant.Q_(vcat(s, [a]))
-        back!(quant.Q_, vcat(s, [a]), [y], α, λ)   # Back with MBSE
+        Q_current = quant.Q_(vcat(s, a))
+        back!(quant.Q_, vcat(s, a), y, α, λ)   # Back with MBSE
 
         # Train actor using policy gradient: ∇ J(π) = ∇ Q̂(s, π(s))
         a_pred = quant.π_(s)
-        Q_gradient = quant.Q_(vcat(s, [a_pred]))  # Grad Q̂ w.r.t. a
+
+
+        Q_gradient = step!(quant.Q_, vcat(s, a_pred), y, α, λ)[end - quant.π_.output.out_features + 1:end]
+        println(a_pred, Q_gradient)
         back!(quant.π_, s, Q_gradient, α, λ)
     end
 
@@ -73,10 +75,14 @@ function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
     update_target_network!(quant.Q_target, quant.Q_, quant.τ)
 end
 
+
+
+
 function add_experience!(quant::Quant, s, a, r, s′)
     """Add an experience tuple to the replay buffer"""
     push!(quant.replay_buffer, (s, a, r, s′))
     if length(quant.replay_buffer) > 10_000  # Limit buffer size
+        println("REPLAY FULL!")
         popfirst!(quant.replay_buffer)
     end
 end

@@ -82,7 +82,7 @@ function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::
 
     ∂L∂z = ∂L∂ŷ .* ∂ŷ∂z 
 
-    net.output.w -= α * (∂L∂z * ∂z∂w  +  λ * net.output.w)
+    net.output.w -= α * (∂L∂z * ∂z∂w + λ * net.output.w)
     net.output.b -= α * ∂L∂z
 
     for l in (length(net.layers) - 1):-1:1
@@ -95,11 +95,14 @@ function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::
         ∂z∂w = layer_input'  # Input to the current layer
 
         net.layers[l].w -= α * (∂L∂z * ∂z∂w + λ * net.layers[l].w)
-        net.layers[l].b -= α * ∂L∂z
+        net.layers[l].b -= α * (∂L∂z)
     end
+
+    return net.layers[1].w' * ∂L∂z #return gradients wrt. x (input)
 end
+
 
 function step!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::Float64)
     forward!(net, x)
-    back!(net, x, y, α, λ)
+    return back!(net, x, y, α, λ)
 end

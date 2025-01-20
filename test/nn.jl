@@ -120,7 +120,7 @@ function test_network(
         xlabel="Epoch",
         ylabel="Loss",
         title="$name Loss",
-        width=100,
+        width=50,
         xticks=true, 
         yticks=true 
     )
