@@ -72,11 +72,11 @@ function (Net::Net)(x::Array{Float64})
     forward!(Net, x)
 end
 
-function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::Float64)
+function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::Float64, B ::Float64=1.0)
     """backpropagates the error and updates the w Currently Assuming mse_L, relu"""
     ŷ = net.output.a
 
-    ∂L∂ŷ = net.L′(ŷ, y)
+    ∂L∂ŷ = net.L′(ŷ, y) * B # Scale gradients
     ∂ŷ∂z = net.output.σ′(net.output.z)
     ∂z∂w = net.layers[end - 1].a'
 
@@ -102,7 +102,7 @@ function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::
 end
 
 
-function step!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::Float64)
+function step!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::Float64, B::Float64=1.0)
     forward!(net, x)
-    return back!(net, x, y, α, λ)
+    return back!(net, x, y, α, λ, B)
 end

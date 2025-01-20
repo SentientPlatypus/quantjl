@@ -16,7 +16,7 @@ mutable struct Quant
     π_target::Net          # Target policy network 
     Q_target::Net          # Target Q-value network 
 
-    replay_buffer::Vector{Tuple{Array{Float64, 1}, Float64, Float64, Array{Float64, 1}}}  # (state, action, reward, next_state)
+    replay_buffer::Vector{Tuple{Array{Float64, 1}, Float64, Float64, Array{Float64, 1}, Float64}}  # (state, action, reward, next_state)
     γ::Float64             # Discount factor 
     τ::Float64             # Target network update rate 
 end
@@ -42,32 +42,26 @@ end
 
 function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
     """Train the Quant agent using a minibatch from the replay buffer"""
-    if length(quant.replay_buffer) < batch_size
+    if length(quant.replay_buffer) < batch_size 
         return  
     end
 
     # Sample a minibatch
     minibatch = [quant.replay_buffer[rand(1:end)] for _ in 1:batch_size]
 
-    for (s, a, r, s′) in minibatch
+    for (s, a, r, s′, d) in minibatch
         # Compute target Q-value: y = r + γ Q̂(s', π_target(s'))
-        a′ = quant.π_target(s′)  
-
-        Q_target_value = quant.Q_target(vcat(s′, a′))
-
-        y = r .+ quant.γ * Q_target_value
+        Q_target_value = quant.Q_target(vcat(s′, quant.π_target(s′)))
+        y = r .+ quant.γ * (1 - d) * Q_target_value
 
         # Train critic: Q̂(s, a) → y
-        Q_current = quant.Q_(vcat(s, a))
-        back!(quant.Q_, vcat(s, a), y, α, λ)   # Back with MBSE
+        step!(quant.Q_, vcat(s, a), y, α, λ, 1.0 / batch_size) # Back with MBSE
 
         # Train actor using policy gradient: ∇ J(π) = ∇ Q̂(s, π(s))
-        a_pred = quant.π_(s)
+        ∂Q∂a = step!(quant.Q_, vcat(s, quant.π_(s)), y, α, λ)[end - quant.π_.output.out_features + 1:end]
 
-
-        Q_gradient = step!(quant.Q_, vcat(s, a_pred), y, α, λ)[end - quant.π_.output.out_features + 1:end]
-        println(a_pred, Q_gradient)
-        back!(quant.π_, s, Q_gradient, α, λ)
+        quant.π_.L′ = (ŷ, y) -> ∂Q∂a  
+        back!(quant.π_, s, [69.420], α, λ) # Use a dummy target since L′ is overridden
     end
 
     # Update target networks: θ_target ← τ * θ + (1 - τ) θ_target
@@ -78,9 +72,9 @@ end
 
 
 
-function add_experience!(quant::Quant, s, a, r, s′)
+function add_experience!(quant::Quant, s, a, r, s′, d)
     """Add an experience tuple to the replay buffer"""
-    push!(quant.replay_buffer, (s, a, r, s′))
+    push!(quant.replay_buffer, (s, a, r, s′, d))
     if length(quant.replay_buffer) > 10_000  # Limit buffer size
         println("REPLAY FULL!")
         popfirst!(quant.replay_buffer)

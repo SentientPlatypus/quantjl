@@ -6,6 +6,9 @@ include("../data.jl")
 
 
 @testset "DDPG" begin
+
+    Random.seed!(1)
+
     π_ = Net([Layer(101, 64, relu, relu′),
               Layer(64, 64, relu, relu′),
               Layer(64, 1, (x) -> tanh.(x), (x) -> 1 .- x.^2)], mse_loss, mse_loss′)
@@ -20,15 +23,26 @@ include("../data.jl")
 
     price_data = get_historical("AAPL") #price percent changes
 
+    highest_capitals = Float64[]
+
     LOOK_BACK_PERIOD = 100
     NUM_EPISODES = 1000
 
     for i in 1:NUM_EPISODES
         current_capital = 1000.0
+        max_capital = current_capital
+
+        d = 0.0
         for t in LOOK_BACK_PERIOD:length(price_data)
-            println("Current capital: $current_capital")
-            if current_capital <= 0  #Terminal state.
+            if d == 1.0
                 break
+            end
+
+            println("Current capital: $current_capital \r")
+
+
+            if current_capital <= 0  #Terminal state.
+                d = 1.0
             end
 
             s = vcat(price_data[t - LOOK_BACK_PERIOD + 1:t], [current_capital])
@@ -43,14 +57,20 @@ include("../data.jl")
 
             # Update capital
             current_capital += r
+            max_capital = max(max_capital, current_capital)
 
             # Next state
             s′ = vcat(price_data[t - LOOK_BACK_PERIOD + 2:t + 1], [current_capital])
 
             # Store experience and train
-            add_experience!(quant, s, a, r, s′)
+            add_experience!(quant, s, a, r, s′, d)
             train!(quant, 0.001, 0.01, 64)
- 
         end
+
+        push!(highest_capitals, max_capital)
     end 
+
+
+    plt = UnicodePlots.lineplot(1:NUM_EPISODES, highest_capitals, xlabel="Episode", ylabel="Highest Capital Achieved", title="DDPG Training", width=100)
+    display(plt)
 end
