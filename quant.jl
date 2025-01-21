@@ -76,7 +76,6 @@ function add_experience!(quant::Quant, s, a, r, s′, d)
     """Add an experience tuple to the replay buffer"""
     push!(quant.replay_buffer, (s, a, r, s′, d))
     if length(quant.replay_buffer) > 10_000  # Limit buffer size
-        println("REPLAY FULL!")
         popfirst!(quant.replay_buffer)
     end
 end

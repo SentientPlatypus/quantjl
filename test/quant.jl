@@ -7,17 +7,19 @@ include("../data.jl")
 
 @testset "DDPG" begin
 
-    Random.seed!(1)
+    Random.seed!(3)
 
     π_ = Net([Layer(101, 64, relu, relu′),
-              Layer(64, 64, relu, relu′),
-              Layer(64, 1, (x) -> tanh.(x), (x) -> 1 .- x.^2)], mse_loss, mse_loss′)
+              Layer(64, 32, relu, relu′),
+              Layer(32, 16, relu, relu′),
+              Layer(16, 1, (x) -> tanh.(x), (x) -> 1 .- x.^2)], mse_loss, mse_loss′)
 
     Q̂ = Net([Layer(102, 64, relu, relu′),  # State + Action as input
-              Layer(64, 64, relu, relu′),
-              Layer(64, 1, relu, relu′)], mse_loss, mse_loss′)
+              Layer(64, 32, relu, relu′),
+              Layer(32, 16, relu, relu′),
+              Layer(16, 1, relu, relu′)], mse_loss, mse_loss′)
 
-    γ = 0.99
+    γ = 0.5
     τ = 0.01
     quant = Quant(π_, Q̂, γ, τ)
 
@@ -29,17 +31,18 @@ include("../data.jl")
     NUM_EPISODES = 1000
 
     for i in 1:NUM_EPISODES
+        if (i % 1000 == 0)
+            println("Episode: $i")
+        end
         current_capital = 1000.0
         max_capital = current_capital
 
         d = 0.0
         for t in LOOK_BACK_PERIOD:length(price_data)
+
             if d == 1.0
                 break
             end
-
-            println("Current capital: $current_capital \r")
-
 
             if current_capital <= 0  #Terminal state.
                 d = 1.0
@@ -48,9 +51,8 @@ include("../data.jl")
             s = vcat(price_data[t - LOOK_BACK_PERIOD + 1:t], [current_capital])
             a = clamp(randn() + quant.π_(s)[1], -1, 1) # a = clip(π(s) + ϵ, -1, 1)
 
-            capital_allocation = current_capital * abs(a)
 
-            # Reward (use price difference to compute profit/loss)
+            capital_allocation = current_capital * min(abs(a), .1) #limit allocation to ten percent of capital.
             price_change = price_data[t + 1] - price_data[t]
             position_value = a * capital_allocation
             r = position_value * price_change / price_data[t]  # Realized P&L
@@ -71,6 +73,6 @@ include("../data.jl")
     end 
 
 
-    plt = UnicodePlots.lineplot(1:NUM_EPISODES, highest_capitals, xlabel="Episode", ylabel="Highest Capital Achieved", title="DDPG Training", width=100)
+    plt = UnicodePlots.lineplot(1:NUM_EPISODES, log10.(highest_capitals), xlabel="Episode", ylabel="Highest Capital (log)", title="DDPG Training", width=100)
     display(plt)
 end
