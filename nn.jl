@@ -32,6 +32,9 @@ mutable struct Layer
 
     σ::Function
     σ′::Function
+
+    ∂w::Matrix{Float64}
+    ∂b::Vector{Float64}
 end
 
 function Layer(in_features::Int, out_features::Int, σ::Function, σ′::Function)
@@ -41,7 +44,10 @@ function Layer(in_features::Int, out_features::Int, σ::Function, σ′::Functio
     w = randn(out_features, in_features) * sqrt(2 / (in_features + out_features))
     b = zeros(out_features)
 
-    Layer(a, z, w, b, in_features, out_features, σ, σ′)
+    ∂w = zeros(out_features, in_features)
+    ∂b = zeros(out_features)
+
+    Layer(a, z, w, b, in_features, out_features, σ, σ′, ∂w, ∂b)
 end
 
 mutable struct Net
@@ -73,7 +79,6 @@ function (Net::Net)(x::Array{Float64})
 end
 
 function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::Float64, B ::Float64=1.0)
-    """backpropagates the error and updates the w Currently Assuming mse_L, relu"""
     ŷ = net.output.a
 
     ∂L∂ŷ = net.L′(ŷ, y) * B # Scale gradients
@@ -82,8 +87,11 @@ function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::
 
     ∂L∂z = ∂L∂ŷ .* ∂ŷ∂z 
 
-    net.output.w -= α * (∂L∂z * ∂z∂w + λ * net.output.w)
-    net.output.b -= α * ∂L∂z
+    net.output.∂w = ∂L∂z * ∂z∂w + λ * net.output.w
+    net.output.∂b = ∂L∂z
+
+    net.output.w -= α * net.output.∂w
+    net.output.b -= α * net.output.∂b
 
     for l in (length(net.layers) - 1):-1:1
         # ∂L∂a = ∑(∂z∂a_l * ∂L∂a_j * ∂aj∂z_j) REMEMBER: [∂a∂z_j * ∂L∂a_j stored in ∂L∂z]
@@ -94,8 +102,11 @@ function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::
         layer_input = (l == 1) ? x : net.layers[l - 1].a
         ∂z∂w = layer_input'  # Input to the current layer
 
-        net.layers[l].w -= α * (∂L∂z * ∂z∂w + λ * net.layers[l].w)
-        net.layers[l].b -= α * (∂L∂z)
+        net.layers[l].∂w = ∂L∂z * ∂z∂w + λ * net.layers[l].w
+        net.layers[l].∂b = ∂L∂z
+
+        net.layers[l].w -= α * net.layers[l].∂w
+        net.layers[l].b -= α * net.layers[l].∂b
     end
 
     return net.layers[1].w' * ∂L∂z #return gradients wrt. x (input)

@@ -14,5 +14,7 @@ function get_historical(ticker::String)
     
     df = CSV.read("data/$ticker.csv", DataFrame)
     change_percent = map(row -> Float64(row.changePercent), eachrow(df))
-    return change_percent
+    return reverse(change_percent)
 end
+
+

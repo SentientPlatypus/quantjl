@@ -1,5 +1,5 @@
 include("nn.jl")
-
+include("test/visualize.jl")
 
 # PROBLEM STATEMENT
 # Maximize the return on investment (ROI) by learning a policy that determines whether to short (-1), hold (0), or long (1) a stock, 
@@ -48,17 +48,25 @@ function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
 
     # Sample a minibatch
     minibatch = [quant.replay_buffer[rand(1:end)] for _ in 1:batch_size]
-
+    ∂Q∂a = 69.0
     for (s, a, r, s′, d) in minibatch
         # Compute target Q-value: y = r + γ Q̂(s', π_target(s'))
         Q_target_value = quant.Q_target(vcat(s′, quant.π_target(s′)))
         y = r .+ quant.γ * (1 - d) * Q_target_value
-
+        
         # Train critic: Q̂(s, a) → y
-        step!(quant.Q_, vcat(s, a), y, α, λ, 1.0 / batch_size) # Back with MBSE
+        step!(quant.Q_, vcat(s, a), y, α, λ) # Back with MBSE
 
         # Train actor using policy gradient: ∇ J(π) = ∇ Q̂(s, π(s))
         ∂Q∂a = step!(quant.Q_, vcat(s, quant.π_(s)), y, α, λ)[end - quant.π_.output.out_features + 1:end]
+
+        # println("Y $y")
+        # println("Q_TARGET_VALUE $Q_target_value")
+        # println("Q_ value $(quant.Q_(vcat(s, a)))")
+        # println("layer 1 gradients $(quant.Q_.layers[1].∂w)")
+        # println("GRADIENT $∂Q∂a")
+        # visualize_net(quant.Q_, vcat(s, quant.π_(s)))
+        
 
         quant.π_.L′ = (ŷ, y) -> ∂Q∂a  
         back!(quant.π_, s, [69.420], α, λ) # Use a dummy target since L′ is overridden
