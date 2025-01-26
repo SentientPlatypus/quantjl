@@ -11,6 +11,10 @@ sigmoid(x) = 1 ./ (1 .+ exp.(-x))
 sigmoid′(x) = sigmoid(x) .* (1 .- sigmoid(x))
 
 
+my_tanh(x) = tanh.(x)
+my_tanh′(x) = 1 .- my_tanh.(x).^2
+
+
 ## LOSS FUNCTIONS
 mse_loss(ŷ, y) = sum((ŷ - y).^2)
 mse_loss′(ŷ, y) = 2 * (ŷ - y)
@@ -85,7 +89,14 @@ function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::
     ∂ŷ∂z = net.output.σ′(net.output.z)
     ∂z∂w = net.layers[end - 1].a'
 
+    # println("dldŷ: $∂L∂ŷ")
+    # println("dyhatdz: $∂ŷ∂z")
+    # println("output z", net.output.z)
+    # println("derivativeactivations: ", net.output.σ′)
+    # println("dldw: $∂z∂w")
+
     ∂L∂z = ∂L∂ŷ .* ∂ŷ∂z 
+    # println("dldzBEGINNING: $∂L∂z")
 
     net.output.∂w = ∂L∂z * ∂z∂w + λ * net.output.w
     net.output.∂b = ∂L∂z
@@ -108,7 +119,8 @@ function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::
         net.layers[l].w -= α * net.layers[l].∂w
         net.layers[l].b -= α * net.layers[l].∂b
     end
-
+    # println("dldz : $∂L∂z")
+    # println("dldx: ", net.layers[1].w' * ∂L∂z)
     return net.layers[1].w' * ∂L∂z #return gradients wrt. x (input)
 end
 

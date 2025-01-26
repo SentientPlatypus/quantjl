@@ -12,12 +12,12 @@ include("../data.jl")
     π_ = Net([Layer(101, 64, sigmoid, sigmoid′),
               Layer(64, 32, relu, relu′),
               Layer(32, 16, relu, relu′),
-              Layer(16, 1, (x) -> tanh.(x), (x) -> 1 .- x.^2)], mse_loss, mse_loss′)
+              Layer(16, 1, my_tanh, my_tanh′)], mse_loss, mse_loss′)
 
-    Q̂ = Net([Layer(102, 64, sigmoid, sigmoid′),  # State + Action as input
+    Q̂ = Net([Layer(102, 64, relu, relu′),  # State + Action as input
               Layer(64, 32, relu, relu′),
               Layer(32, 16, relu, relu′),
-              Layer(16, 1, relu, relu′)], mse_loss, mse_loss′)
+              Layer(16, 1, (x) -> clamp(-50.0, 50.0), (x) -> (-50.0 < x < 50.0 ? 1.0 : 0.0))], mse_loss, mse_loss′)
 
     γ = 0.5
     τ = 0.01
@@ -53,7 +53,7 @@ include("../data.jl")
             s = vcat(price_data[t - LOOK_BACK_PERIOD + 1:t], [current_capital])
             a = clamp(randn() + quant.π_(s)[1], -1, 1) # a = clip(π(s) + ϵ, -1, 1)
 
-            capital_allocation = current_capital * abs(a) * .1 #limit allocation to ten percent of capital.
+            capital_allocation = current_capital * abs(a) * .50 #limit allocation to 50 percent of capital.
             current_capital -= capital_allocation 
 
             percent_change = price_data[t + 1]  # Use the percent change directly
@@ -62,7 +62,7 @@ include("../data.jl")
 
 
             # Update capital
-            println("CAPITAL BEFORE: $(current_capital+capital_allocation) ACTION: $a $(a < 0 ? "SHORT" : "LONG"): $capital_allocation PRICE CHANGE: $percent_change REWARD: $r")
+            # println("CAPITAL BEFORE: $(current_capital+capital_allocation) ACTION: $a $(a < 0 ? "SHORT" : "LONG"): $capital_allocation PRICE CHANGE: $percent_change REWARD: $r")
             current_capital += r + capital_allocation
             max_capital = max(max_capital, current_capital)
             

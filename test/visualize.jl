@@ -1,5 +1,5 @@
 include("../nn.jl")
-include("nn.jl")
+
 using Printf
 function visualize_net(net::Net, x::Vector{Float64})
     """
