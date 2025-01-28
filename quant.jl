@@ -50,17 +50,23 @@ function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
     minibatch = [quant.replay_buffer[rand(1:end)] for _ in 1:batch_size]
     ∂Q∂a = 69.0
     for (s, a, r, s′, d) in minibatch
-        # println("\n Compute target Q-value: y = r + γ Q̂(s', π_target(s'))")
+        # println("\n\n\n Compute target Q-value: y = r + γ Q̂(s', π_target(s'))")
         Q_target_value = quant.Q_target(vcat(s′, quant.π_target(s′)))
         y = r .+ quant.γ * (1 - d) * Q_target_value
-        
+        # println("Y: $y")
+        # println("Q_ OUTPUT: $(quant.Q_(vcat(s, a)))")
         step!(quant.Q_, vcat(s, a), y, α, λ) # Back with MBSE
         
         # println("\n Train actor using policy gradient: ∇ J(π) = ∇ Q̂(s, π(s))")
+        # println("ACTION: $(quant.π_(s))")
         ∂Q∂a = step!(quant.Q_, vcat(s, quant.π_(s)), y, α, λ)
+        # println("∂Q∂a: $(∂Q∂a[end - quant.π_.output.out_features + 1:end])")
+
+        if any(isnan, ∂Q∂a)
+            error("NaN detected in ∂Q∂a. Terminating program.")
+        end
 
         quant.π_.L′ = (ŷ, y) -> ∂Q∂a[end - quant.π_.output.out_features + 1:end]
-        # println("L' is now $(quant.π_.L′(0.0,0.0))")
         back!(quant.π_, s, [69.420], α, λ) # Use a dummy target since L′ is overridden
     end
 
