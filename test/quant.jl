@@ -35,7 +35,7 @@ include("../data.jl")
     std_capital = 1.0            # Assume a reasonable standard deviation (can be tuned)
     
     LOOK_BACK_PERIOD = 100
-    NUM_EPISODES = 1000
+    NUM_EPISODES = 60
     
     for i in 1:NUM_EPISODES
         if (i % 10 == 0)
@@ -44,7 +44,7 @@ include("../data.jl")
         current_capital = 1000.0
         total_reward = 0;
         max_reward = -Inf  # Initialize max_reward for the episode
-    
+      
         d = 0.0
         episode_length = 0
     
@@ -85,6 +85,6 @@ include("../data.jl")
         push!(total_rewards, total_reward)
     end 
     
-    plt = UnicodePlots.lineplot(1:NUM_EPISODES, log10.(total_rewards), xlabel="Episode", ylabel="Highest Capital (log)", title="DDPG Training", width=100)
+    plt = UnicodePlots.lineplot(1:NUM_EPISODES, total_rewards, xlabel="Episode", ylabel="Highest Capital (log)", title="DDPG Training", width=100)
     display(plt)
 end
