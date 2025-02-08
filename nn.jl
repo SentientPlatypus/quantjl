@@ -102,8 +102,8 @@ function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::
     net.output.∂b = ∂L∂z
 
     # Clip gradients
-    net.output.∂w = clamp.(net.output.∂w, -clip_value, clip_value)
-    net.output.∂b = clamp.(net.output.∂b, -clip_value, clip_value)
+    # net.output.∂w = clamp.(net.output.∂w, -clip_value, clip_value)
+    # net.output.∂b = clamp.(net.output.∂b, -clip_value, clip_value)
 
     net.output.w -= α * net.output.∂w
     net.output.b -= α * net.output.∂b
@@ -121,8 +121,8 @@ function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::
         net.layers[l].∂b = ∂L∂z
 
         # Clip gradients
-        net.layers[l].∂w = clamp.(net.layers[l].∂w, -clip_value, clip_value)
-        net.layers[l].∂b = clamp.(net.layers[l].∂b, -clip_value, clip_value)
+        # net.layers[l].∂w = clamp.(net.layers[l].∂w, -clip_value, clip_value)
+        # net.layers[l].∂b = clamp.(net.layers[l].∂b, -clip_value, clip_value)
 
         net.layers[l].w -= α * net.layers[l].∂w
         net.layers[l].b -= α * net.layers[l].∂b
