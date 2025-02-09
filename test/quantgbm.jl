@@ -34,7 +34,7 @@ include("../data.jl")
 
 
     LOOK_BACK_PERIOD = 100
-    NUM_EPISODES = 1000
+    NUM_EPISODES = 100
     
     for i in 1:NUM_EPISODES
         if (i % 10 == 0)
@@ -79,12 +79,12 @@ include("../data.jl")
         
             # Train
             add_experience!(quant, s, a, scaled_r, s′, d)
-            train!(quant, 0.00001, 0.0, 64)
+            train!(quant, 0.0001, 0.0, 64)
         end
         
         push!(total_rewards, total_reward)
     end 
     
-    plt = UnicodePlots.lineplot(1:NUM_EPISODES, total_rewards, xlabel="Episode", ylabel="Highest Capital (log)", title="DDPG Training", width=100)
+    plt = UnicodePlots.lineplot(1:NUM_EPISODES, total_rewards, xlabel="Episode", ylabel="total reward", title="DDPG Training", width=100)
     display(plt)
 end
