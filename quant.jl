@@ -62,7 +62,7 @@ function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
         ∂Q∂a = step!(quant.Q_, vcat(s, quant.π_(s)), y, α, λ)
         # println("∂Q∂a: $(∂Q∂a[end - quant.π_.output.out_features + 1:end])")
 
-        if any(isnan, ∂Q∂a)
+        if any(isnan, ∂Q∂a) || any(isinf, ∂Q∂a) || ∂Q∂a == 0.0
             error("NaN detected in ∂Q∂a. Terminating program.")
         end
 
