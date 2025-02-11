@@ -29,6 +29,8 @@ include("../data.jl")
     
 
     total_rewards = Float64[]
+
+    capitals = Float64[]
     mean_capital = log10(1000.0)  # Initial capital in log space
     std_capital = 1.0            # Assume a reasonable standard deviation (can be tuned)
 
@@ -54,14 +56,13 @@ include("../data.jl")
 
             # Normalize state
             s = vcat(price_vscores[t - LOOK_BACK_PERIOD + 1:t], [(log10(current_capital) - mean_capital) / std_capital])
-            s′ = vcat(price_vscores[t - LOOK_BACK_PERIOD + 2:t + 1], [(log10(current_capital) - mean_capital) / std_capital])
+            
         
             # Generate action and scale reward
-            ε = max(0.1, 1.0 - i / NUM_EPISODES)  # Decreasing exploration
-            a = clamp(ε * randn() + quant.π_(s)[1], -1, 1)
+            ε = randn() * .25
+            a = clamp(ε + quant.π_(s)[1], -1, 1)
             capital_allocation = current_capital * min(abs(a), .5)
             current_capital -= capital_allocation
-
 
             percent_change = price_data[t + 1]
             r = (a > 0.0 ? 1 : -1) * capital_allocation * (percent_change / 100.0)
@@ -72,6 +73,13 @@ include("../data.jl")
         
             current_capital += scaled_r * max_reward + capital_allocation
 
+            push!(capitals, current_capital)
+            if length(capitals) > 100
+                mean_capital = mean(log10.(capitals))
+                std_capital = std(log10.(capitals))
+            end
+
+            s′ = vcat(price_vscores[t - LOOK_BACK_PERIOD + 2:t + 1], [(log10(current_capital) - mean_capital) / std_capital])
 
             total_reward += scaled_r
         
