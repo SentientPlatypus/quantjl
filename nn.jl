@@ -82,7 +82,7 @@ function (Net::Net)(x::Array{Float64})
     forward!(Net, x)
 end
 
-function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::Float64, B ::Float64=1.0, clip_value::Float64=1.0)
+function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::Float64, B ::Float64=1.0, update::Bool=true)
     ŷ = net.output.a
 
     ∂L∂ŷ = net.L′(ŷ, y) * B # Scale gradients
@@ -105,8 +105,10 @@ function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::
     # net.output.∂w = clamp.(net.output.∂w, -clip_value, clip_value)
     # net.output.∂b = clamp.(net.output.∂b, -clip_value, clip_value)
 
-    net.output.w -= α * net.output.∂w
-    net.output.b -= α * net.output.∂b
+    if update
+        net.output.w -= α * net.output.∂w
+        net.output.b -= α * net.output.∂b
+    end
 
     for l in (length(net.layers) - 1):-1:1
         # ∂L∂a = ∑(∂z∂a_l * ∂L∂a_j * ∂aj∂z_j) REMEMBER: [∂a∂z_j * ∂L∂a_j stored in ∂L∂z]
@@ -124,15 +126,17 @@ function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::
         # net.layers[l].∂w = clamp.(net.layers[l].∂w, -clip_value, clip_value)
         # net.layers[l].∂b = clamp.(net.layers[l].∂b, -clip_value, clip_value)
 
-        net.layers[l].w -= α * net.layers[l].∂w
-        net.layers[l].b -= α * net.layers[l].∂b
+        if update
+            net.layers[l].w -= α * net.layers[l].∂w
+            net.layers[l].b -= α * net.layers[l].∂b
+        end
     end
     # println("dldx: ", net.layers[1].w' * ∂L∂z)
     return net.layers[1].w' * ∂L∂z #return gradients wrt. x (input)
 end
 
 
-function step!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::Float64, B::Float64=1.0)
+function step!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::Float64, B::Float64=1.0, update::Bool=true)
     forward!(net, x)
-    return back!(net, x, y, α, λ, B)
+    return back!(net, x, y, α, λ, B, update)
 end

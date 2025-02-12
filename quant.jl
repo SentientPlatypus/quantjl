@@ -51,19 +51,20 @@ function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
     ∂Q∂a = 69.0
     for (s, a, r, s′, d) in minibatch
         Q_target_value = quant.Q_target(vcat(s′, quant.π_target(s′)))
+
         y = r .+ quant.γ * (1 - d) * Q_target_value
 
 
         step!(quant.Q_, vcat(s, a), y, α, λ, 1/length(minibatch)) # Back with MBSE
         
-        ∂Q∂a = step!(quant.Q_, vcat(s, quant.π_(s)), y, α, λ, 1/length(minibatch))
+        ∂Q∂a = step!(quant.Q_, vcat(s, quant.π_(s)), y, α, λ, 1/length(minibatch), false) 
 
         if any(isnan, ∂Q∂a) || any(isinf, ∂Q∂a) || ∂Q∂a == 0.0
-            error("NaN detected in ∂Q∂a. Terminating program.")
+            error("invalid gradient: $(∂Q∂a)")
         end
 
         quant.π_.L′ = (ŷ, y) -> -∂Q∂a[end - quant.π_.output.out_features + 1:end]
-        back!(quant.π_, s, [69.420], α, λ, 1/length(minibatch)) # Use a dummy target since L′ is overridden
+        step!(quant.π_, s, [69.420], α, λ, 1/length(minibatch)) # Use a dummy target since L′ is overridden
     end
 
     # Update target networks: θ_target ← τ * θ + (1 - τ) θ_target

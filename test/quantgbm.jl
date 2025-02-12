@@ -20,8 +20,8 @@ include("../data.jl")
               Layer(32, 16, relu, relu′),
               Layer(16, 1, my_tanh, my_tanh′)], mse_loss, mse_loss′)
 
-    γ = 0.5
-    τ = 0.05
+    γ = 0.9
+    τ = 0.09
     quant = Quant(π_, Q̂, γ, τ)
 
     price_data = get_historical("AAPL") #price percent changes
@@ -36,7 +36,7 @@ include("../data.jl")
 
 
     LOOK_BACK_PERIOD = 100
-    NUM_EPISODES = 100
+    NUM_EPISODES = 500
     
     for i in 1:NUM_EPISODES
         if (i % 10 == 0)
@@ -53,10 +53,8 @@ include("../data.jl")
 
             episode_length += 1
 
-
             # Normalize state
             s = vcat(price_vscores[t - LOOK_BACK_PERIOD + 1:t], [(log10(current_capital) - mean_capital) / std_capital])
-            
         
             # Generate action and scale reward
             ε = randn() * .25
@@ -92,7 +90,7 @@ include("../data.jl")
 
             # Train 
             add_experience!(quant, s, a, scaled_r, s′, d)
-            train!(quant, 0.00001, 0.0001, 64)
+            train!(quant, 0.0001, 0.0001, 64)
         end
         
         push!(total_rewards, total_reward)
