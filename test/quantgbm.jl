@@ -36,7 +36,7 @@ include("../data.jl")
 
 
     LOOK_BACK_PERIOD = 100
-    NUM_EPISODES = 500
+    NUM_EPISODES = 100
     
     for i in 1:NUM_EPISODES
         if (i % 10 == 0)
@@ -50,6 +50,9 @@ include("../data.jl")
         episode_length = 0
     
         for t in LOOK_BACK_PERIOD:length(price_data) - 1
+            if d == 1.0
+                break
+            end
 
             episode_length += 1
 
@@ -79,13 +82,12 @@ include("../data.jl")
 
             s′ = vcat(price_vscores[t - LOOK_BACK_PERIOD + 2:t + 1], [(log10(current_capital) - mean_capital) / std_capital])
 
-            total_reward += scaled_r
+            total_reward += scaled_r * max_reward
         
             if episode_length > 1000 || current_capital < 100.0
-                r -= 1000  # Harsh penalty for depleting capital
+                r -= 500  # Harsh penalty for depleting capital
                 scaled_r = r / max_reward
                 d = 1.0
-                break
             end
 
             # Train 
