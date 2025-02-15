@@ -31,13 +31,14 @@ include("../data.jl")
 
     total_rewards = Float64[]
 
-    capitals = Float64[]
-    mean_capital = log10(1000.0)  # Initial capital in log space
-    std_capital = 1.0            # Assume a reasonable standard deviation (can be tuned)
+
+    capitals = 1000 .+ 200 .* randn(100)
+    mean_capital = mean(capitals) # Initial capital in log space
+    std_capital = std(capitals)         # Assume a reasonable standard deviation (can be tuned)
 
 
     LOOK_BACK_PERIOD = 100
-    NUM_EPISODES = 300
+    NUM_EPISODES = 200
     
     for i in 1:NUM_EPISODES
         if (i % 10 == 0)
@@ -58,7 +59,7 @@ include("../data.jl")
             episode_length += 1
 
             # Normalize state
-            s = vcat(price_vscores[t - LOOK_BACK_PERIOD + 1:t], [(log10(current_capital) - mean_capital) / std_capital])
+            s = vcat(price_vscores[t - LOOK_BACK_PERIOD + 1:t], [(current_capital - mean_capital) / std_capital])
         
             # Generate action 
             ε = (i <=100 ) ? randn() * .25 : 0.0
@@ -77,12 +78,11 @@ include("../data.jl")
 
 
             push!(capitals, current_capital)
-            if length(capitals) > 100
-                mean_capital = mean(log10.(capitals))
-                std_capital = std(log10.(capitals))
-            end
+            mean_capital = mean(capitals)
+            std_capital = std(capitals)
 
-            s′ = vcat(price_vscores[t - LOOK_BACK_PERIOD + 2:t + 1], [(log10(current_capital) - mean_capital) / std_capital])
+
+            s′ = vcat(price_vscores[t - LOOK_BACK_PERIOD + 2:t + 1], [(current_capital- mean_capital) / std_capital])
 
             total_reward += scaled_r * max_reward
         
