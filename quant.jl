@@ -63,8 +63,9 @@ function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
             error("invalid gradient: $(∂Q∂a)")
         end
 
-        quant.π_.L′ = (ŷ, y) -> -∂Q∂a[end - quant.π_.output.out_features + 1:end]
-        step!(quant.π_, s, [69.420], α, λ, 1/length(minibatch)) # Use a dummy target since L′ is overridden
+        quant.π_.L′ = (ŷ, y) -> -∂Q∂a[end - quant.π_.output.out_features + 1:end] # GRADIENT ASCENT. 
+        #step!(quant.π_, s, [69.420], α, λ, 1/length(minibatch))
+        back_custom!(quant.π_, s, -∂Q∂a[end - quant.π_.output.out_features + 1:end], α, λ, 1/length(minibatch)) 
     end
 
     # Update target networks: θ_target ← τ * θ + (1 - τ) θ_target

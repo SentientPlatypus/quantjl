@@ -15,3 +15,11 @@ using Plots
 end
 
 
+@testset "PATH 1000" begin
+    Random.seed!(3)
+    percent_change = get_historical_raw("AAPL")
+    plot(percent_change[begin:1000], title="GBM Path", xlabel="Time", ylabel="Value")
+    savefig("plots/appl_1000.png")
+end
+
+

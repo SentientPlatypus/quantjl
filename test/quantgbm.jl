@@ -25,33 +25,35 @@ include("../data.jl")
     τ = 0.09
     quant = Quant(π_, Q̂, γ, τ)
 
-    price_data = get_historical("AAPL") #price percent changes
-    price_vscores = get_historical_vscores("AAPL") #price vscores
-    
-
     total_rewards = Float64[]
 
 
     capitals = 1000 .+ 200 .* randn(100)
-    mean_capital = mean(capitals) # Initial capital in log space
-    std_capital = std(capitals)         # Assume a reasonable standard deviation (can be tuned)
+    μ_capital = mean(capitals) # Initial capital in log space
+    σ_capital = std(capitals)         # Assume a reasonable standard deviation (can be tuned)
+
+    rewards = randn(100)
+    μ_rewards = mean(rewards) 
+    σ_rewards = std(rewards)     
 
 
     LOOK_BACK_PERIOD = 100
-    NUM_EPISODES = 200
+    NUM_EPISODES = 2000
+    
+    price_data = get_historical("AAPL")[LOOK_BACK_PERIOD + 1:end] #price percent changes
+    price_vscores = get_historical_vscores("AAPL", LOOK_BACK_PERIOD) #price vscores
     
     for i in 1:NUM_EPISODES
-        if (i % 10 == 0)
-            println("Episode: $i")
-        end
+
+        println("Episode: $i")
 
         current_capital = 1000.0
         total_reward = 0;
-        max_reward = -Inf  # Initialize max_reward for the episode
         d = 0.0
         episode_length = 0
-    
-        for t in LOOK_BACK_PERIOD:length(price_data) - 1
+
+
+        for t in LOOK_BACK_PERIOD:length(price_vscores) - 1
             if d == 1.0
                 break
             end
@@ -59,46 +61,45 @@ include("../data.jl")
             episode_length += 1
 
             # Normalize state
-            s = vcat(price_vscores[t - LOOK_BACK_PERIOD + 1:t], [(current_capital - mean_capital) / std_capital])
+            s = vcat(price_vscores[t - LOOK_BACK_PERIOD + 1:t], [(current_capital - μ_capital) / σ_capital])
         
             # Generate action 
-            ε = (i <=100 ) ? randn() * .25 : 0.0
+            ε = (i <= 200 ) ? randn() * .1 : randn() * 0.25 * exp(-0.005 * i)
             a = clamp(ε + quant.π_(s)[1], -1, 1)
             capital_allocation = current_capital * min(abs(a), .5)
             current_capital -= capital_allocation
 
             # Calculate reward
             percent_change = price_data[t + 1]
-            r = (a > 0.0 ? 1 : -1) * capital_allocation * (percent_change / 100.0)
-            max_reward = max(max_reward, r)  # Update max_reward
-            scaled_r = r / max_reward  # Scale reward
+            raw_r = (a > 0.0 ? 1 : -1) * capital_allocation * (percent_change / 100.0)
+            push!(rewards, raw_r)
+            μ_rewards = mean(rewards)
+            σ_rewards = std(rewards)
 
-            # println("CAPITAL BEFORE: $(current_capital+capital_allocation) ACTION: $a $(a < 0 ? "SHORT" : "LONG"): $capital_allocation PRICE CHANGE: $percent_change REWARD: $scaled_r")
-            current_capital += scaled_r * max_reward + capital_allocation
-
+            #println("CAPITAL BEFORE: $(current_capital+capital_allocation) ACTION: $a $(a < 0 ? "SHORT" : "LONG"): $capital_allocation PRICE CHANGE: $percent_change REWARD: $raw_r")
+            current_capital += raw_r + capital_allocation
 
             push!(capitals, current_capital)
-            mean_capital = mean(capitals)
-            std_capital = std(capitals)
+            μ_capital = mean(capitals)
+            σ_capital = std(capitals)
 
 
-            s′ = vcat(price_vscores[t - LOOK_BACK_PERIOD + 2:t + 1], [(current_capital- mean_capital) / std_capital])
+            s′ = vcat(price_vscores[t - LOOK_BACK_PERIOD + 2:t + 1], [(current_capital- μ_capital) / σ_capital])
 
-            total_reward += scaled_r * max_reward
+            total_reward += raw_r 
         
-            if episode_length > 1000 || current_capital < 100.0
-                r -= 500  # Harsh penalty for depleting capital
-                scaled_r = r / max_reward
+            if current_capital < 700.0
+                raw_r -= 500  # Harsh penalty for depleting capital
                 d = 1.0
             end
 
 
-            add_experience!(quant, s, a, scaled_r, s′, d)
+            add_experience!(quant, s, a, (raw_r - μ_rewards) / σ_rewards, s′, d)
             train!(quant, 0.0001, 0.0001, 64)
         end
         
         if i % 100 == 0 || i == 1
-            Plots.histogram(capitals[end - episode_length + 2:end], title="Episode $i Capital Distribution", xlabel="Capital", ylabel="Frequency")
+            Plots.plot(capitals[end - episode_length + 2:end], title="Episode $i Capital over time", xlabel="Time", ylabel="Capital")
             Plots.savefig("plots/capital_distribution/episode_$(i).png")
         end
 
@@ -106,7 +107,7 @@ include("../data.jl")
     end 
     
     Plots.histogram(capitals, title="Full Capital Distribution", xlabel="Capital", ylabel="Frequency")
-    Plots.savefig("plots/capital_distribution/300episodes_full.png")
-    plt = UnicodePlots.lineplot(1:NUM_EPISODES, total_rewards, xlabel="Episode", ylabel="total reward", title="DDPG Training", width=100)
-    display(plt)
+    Plots.savefig("plots/capital_distribution/episodes_full.png")
+    plt = Plots.plot(1:NUM_EPISODES, total_rewards, xlabel="Episode", ylabel="total reward", title="DDPG Training")
+    Plots.savefig("plots/total_rewards.png")
 end

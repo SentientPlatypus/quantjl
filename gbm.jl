@@ -21,16 +21,7 @@ function vscore(raw::Vector{Float64}, OBS::Int=60, EPOCH::Int=1000, EXT::Int=20)
         noise = cumsum(randn(EPOCH, EXT), dims=2)  # cumsum first
         paths = s0 .* exp.(σ .* noise .+ drift .* (1:EXT)')  # Then scale and apply drift
         
-
-        # Count exceedances
         sum_exceed = count(>(s0), paths)
-
-        # Plot a sample when near the end
-        # if t == length(raw)-4
-        #     plot(paths', title="GBM Path", xlabel="Time", ylabel="Value", label=false)
-        #     savefig("plots/gbm_path_full.png")
-        # end
-
         push!(v, sum_exceed / (EPOCH * EXT))
     end
 

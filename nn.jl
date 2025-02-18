@@ -101,10 +101,6 @@ function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::
     net.output.∂w = ∂L∂z * ∂z∂w + λ * net.output.w
     net.output.∂b = ∂L∂z
 
-    # Clip gradients
-    # net.output.∂w = clamp.(net.output.∂w, -clip_value, clip_value)
-    # net.output.∂b = clamp.(net.output.∂b, -clip_value, clip_value)
-
     if update
         net.output.w -= α * net.output.∂w
         net.output.b -= α * net.output.∂b
@@ -122,10 +118,6 @@ function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::
         net.layers[l].∂w = ∂L∂z * ∂z∂w + λ * net.layers[l].w
         net.layers[l].∂b = ∂L∂z
 
-        # Clip gradients
-        # net.layers[l].∂w = clamp.(net.layers[l].∂w, -clip_value, clip_value)
-        # net.layers[l].∂b = clamp.(net.layers[l].∂b, -clip_value, clip_value)
-
         if update
             net.layers[l].w -= α * net.layers[l].∂w
             net.layers[l].b -= α * net.layers[l].∂b
@@ -139,4 +131,41 @@ end
 function step!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::Float64, B::Float64=1.0, update::Bool=true)
     forward!(net, x)
     return back!(net, x, y, α, λ, B, update)
+end
+
+
+
+function back_custom!(net::Net, x::Vector{Float64}, grad_output::Vector{Float64}, α::Float64, λ::Float64, B::Float64=1.0, update::Bool=true)
+    forward!(net, x)
+    # Here, grad_output is assumed to be the gradient of -Q with respect to the network's output (i.e. d(-Q)/da).
+    # Now compute gradient at output layer: multiply by the derivative of the activation.
+    grad_z = grad_output .* net.output.σ′(net.output.z) .* B
+
+    # Compute gradients for output layer weights and bias.
+    # For the output layer, the input is the activation from the previous layer.
+    prev_activation = (length(net.layers) > 1) ? net.layers[end-1].a : x
+    net.output.∂w = grad_z * prev_activation' + λ * net.output.w
+    net.output.∂b = grad_z
+
+    if update
+        net.output.w -= α * net.output.∂w
+        net.output.b -= α * net.output.∂b
+    end
+
+    # Backpropagate through hidden layers.
+    for l in (length(net.layers) - 1):-1:1
+        grad_a = net.layers[l+1].w' * grad_z
+        grad_z = grad_a .* net.layers[l].σ′(net.layers[l].z)
+        layer_input = (l == 1) ? x : net.layers[l-1].a
+        net.layers[l].∂w = grad_z * layer_input' + λ * net.layers[l].w
+        net.layers[l].∂b = grad_z
+
+        if update
+            net.layers[l].w -= α * net.layers[l].∂w
+            net.layers[l].b -= α * net.layers[l].∂b
+        end
+    end
+
+    # Optionally, return the gradient with respect to the input if needed.
+    return net.layers[1].w' * grad_z
 end
