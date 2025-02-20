@@ -38,7 +38,7 @@ include("../data.jl")
 
 
     LOOK_BACK_PERIOD = 100
-    NUM_EPISODES = 2000
+    NUM_EPISODES = 400
     
     price_data = get_historical("AAPL")[LOOK_BACK_PERIOD + 1:end] #price percent changes
     price_vscores = get_historical_vscores("AAPL", LOOK_BACK_PERIOD) #price vscores
@@ -61,10 +61,10 @@ include("../data.jl")
             episode_length += 1
 
             # Normalize state
-            s = vcat(price_vscores[t - LOOK_BACK_PERIOD + 1:t], [(current_capital - μ_capital) / σ_capital])
+            s = vcat(price_vscores[t - LOOK_BACK_PERIOD + 1:t], [log10(current_capital)])
         
             # Generate action 
-            ε = (i <= 200 ) ? randn() * .1 : randn() * 0.25 * exp(-0.005 * i)
+            ε = (i <= 200 ) ? randn() * .3 : randn() * 0.25 * exp(-0.005 * i)
             a = clamp(ε + quant.π_(s)[1], -1, 1)
             capital_allocation = current_capital * min(abs(a), .5)
             current_capital -= capital_allocation
@@ -84,7 +84,7 @@ include("../data.jl")
             σ_capital = std(capitals)
 
 
-            s′ = vcat(price_vscores[t - LOOK_BACK_PERIOD + 2:t + 1], [(current_capital- μ_capital) / σ_capital])
+            s′ = vcat(price_vscores[t - LOOK_BACK_PERIOD + 2:t + 1], [log10(current_capital)])
 
             total_reward += raw_r 
         
@@ -98,8 +98,8 @@ include("../data.jl")
             train!(quant, 0.0001, 0.0001, 64)
         end
         
-        if i % 100 == 0 || i == 1
-            Plots.plot(capitals[end - episode_length + 2:end], title="Episode $i Capital over time", xlabel="Time", ylabel="Capital")
+        if i % 20 == 0 || i == 1
+            Plots.plot(capitals[end - episode_length + 1:end], title="Episode $i Capital over time", xlabel="Time", ylabel="Capital")
             Plots.savefig("plots/capital_distribution/episode_$(i).png")
         end
 
