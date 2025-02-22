@@ -38,7 +38,7 @@ include("../data.jl")
 
 
     LOOK_BACK_PERIOD = 100
-    NUM_EPISODES = 400
+    NUM_EPISODES = 500
     
     price_data = get_historical("AAPL")[LOOK_BACK_PERIOD + 1:end] #price percent changes
     price_vscores = get_historical_vscores("AAPL", LOOK_BACK_PERIOD) #price vscores
@@ -64,7 +64,8 @@ include("../data.jl")
             s = vcat(price_vscores[t - LOOK_BACK_PERIOD + 1:t], [log10(current_capital)])
         
             # Generate action 
-            ε = (i <= 200 ) ? randn() * .3 : randn() * 0.25 * exp(-0.005 * i)
+            ε = (i <= 300 ) ? randn() * .4 : randn() * 0.3 * exp(-0.002 * i)
+
             a = clamp(ε + quant.π_(s)[1], -1, 1)
             capital_allocation = current_capital * min(abs(a), .5)
             current_capital -= capital_allocation
@@ -89,7 +90,7 @@ include("../data.jl")
             total_reward += raw_r 
         
             if current_capital < 700.0
-                raw_r -= 500  # Harsh penalty for depleting capital
+                raw_r -= 500
                 d = 1.0
             end
 
@@ -100,7 +101,7 @@ include("../data.jl")
         
         if i % 20 == 0 || i == 1
             Plots.plot(capitals[end - episode_length + 1:end], title="Episode $i Capital over time", xlabel="Time", ylabel="Capital")
-            Plots.savefig("plots/capital_distribution/episode_$(i).png")
+            Plots.savefig("plots/capital_distribution/penalize_1000/episode_$(i).png")
         end
 
         push!(total_rewards, total_reward)
