@@ -21,7 +21,7 @@ include("../data.jl")
               Layer(32, 16, relu, relu′),
               Layer(16, 1, my_tanh, my_tanh′)], mse_loss, mse_loss′)
 
-    γ = 0.9
+    γ = 0.95
     τ = 0.09
     quant = Quant(π_, Q̂, γ, τ)
 
@@ -105,8 +105,18 @@ include("../data.jl")
         end
         
         if i % 20 == 0 || i == 1
-            Plots.plot(capitals[end - episode_length + 1:end], title="Episode $i Capital over time", xlabel="Time", ylabel="Capital")
-            Plots.savefig("plots/capital_distribution/penalize_1000/episode_$(i).png")
+            # Compute benchmark capital over the same episode length
+            benchmark_capital_traj = 1000 * cumprod(1 .+ price_data[LOOK_BACK_PERIOD:LOOK_BACK_PERIOD+episode_length-1] ./ 100)
+
+            # Plot agent's capital trajectory
+            Plots.plot(capitals[end - episode_length + 1:end], title="Episode $i Capital over time", 
+                    xlabel="Time", ylabel="Capital", label="Agent", lw=2)
+
+            # Overlay benchmark trajectory (Buy & Hold)
+            Plots.plot!(benchmark_capital_traj, label="Benchmark (Buy & Hold)", linestyle=:dash, color=:red, lw=2)
+
+            # Save the figure
+            Plots.savefig("plots/capital_distribution/higher_gamma_reward_over1000/episode_$(i).png")
         end
 
         push!(total_rewards, total_reward)
