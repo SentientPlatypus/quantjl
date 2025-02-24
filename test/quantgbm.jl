@@ -64,10 +64,10 @@ include("../data.jl")
             s = vcat(price_vscores[t - LOOK_BACK_PERIOD + 1:t], [log10(current_capital)])
         
             # Generate action 
-            ε = (i <= 300 ) ? randn() * .4 : randn() * 0.3 * exp(-0.002 * i)
+            ε = (i <= 300 ) ? randn() * .4 : randn() * 0.2 * exp(-0.002 * i)
 
             a = clamp(ε + quant.π_(s)[1], -1, 1)
-            capital_allocation = current_capital * min(abs(a), .5)
+            capital_allocation = current_capital * min(abs(a), .3)
             current_capital -= capital_allocation
 
             # Calculate reward
@@ -91,6 +91,11 @@ include("../data.jl")
         
             if current_capital < 700.0
                 raw_r -= 500
+                d = 1.0
+            end
+
+            if t == length(price_vscores) - 1
+                raw_r += current_capital - 1000
                 d = 1.0
             end
 

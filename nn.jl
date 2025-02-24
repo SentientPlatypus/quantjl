@@ -88,16 +88,8 @@ function back!(net::Net, x::Array{Float64}, y::Array{Float64}, α::Float64, λ::
     ∂L∂ŷ = net.L′(ŷ, y) * B # Scale gradients
     ∂ŷ∂z = net.output.σ′(net.output.z)
     ∂z∂w = net.layers[end - 1].a'
-
-    # println("dldŷ: $∂L∂ŷ")
-    # println("dyhatdz: $∂ŷ∂z")
-    # println("output z", net.output.z)
-    # println("derivativeactivations: ", net.output.σ′)
-    # println("dldw: $∂z∂w")
-
     ∂L∂z = ∂L∂ŷ .* ∂ŷ∂z 
-    # println("dldzBEGINNING: $∂L∂z")
-
+    
     net.output.∂w = ∂L∂z * ∂z∂w + λ * net.output.w
     net.output.∂b = ∂L∂z
 
