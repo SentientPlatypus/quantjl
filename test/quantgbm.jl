@@ -11,18 +11,20 @@ include("../data.jl")
 
     Random.seed!(3)
 
-    π_ = Net([Layer(101, 64, relu, relu′),
+    π_ = Net([Layer(101, 80, relu, relu′),
+              Layer(80, 64, relu, relu′),
               Layer(64, 32, relu, relu′),
               Layer(32, 16, relu, relu′),
               Layer(16, 1, my_tanh, my_tanh′)], mse_loss, mse_loss′)
 
-    Q̂ = Net([Layer(102, 64, relu, relu′),  # State + Action as input
+    Q̂ = Net([ Layer(102, 80, relu, relu′),  # State + Action as input
+              Layer(80, 64, relu, relu′),
               Layer(64, 32, relu, relu′),
               Layer(32, 16, relu, relu′),
               Layer(16, 1, my_tanh, my_tanh′)], mse_loss, mse_loss′)
 
     γ = 0.95
-    τ = 0.09
+    τ = 0.1
     quant = Quant(π_, Q̂, γ, τ)
 
     total_rewards = Float64[]
@@ -64,10 +66,10 @@ include("../data.jl")
             s = vcat(price_vscores[t - LOOK_BACK_PERIOD + 1:t], [log10(current_capital)])
         
             # Generate action 
-            ε = (i <= 300 ) ? randn() * .4 : randn() * 0.2 * exp(-0.002 * i)
+            ε = (i <= 100 ) ? randn() * .4 : randn() * 0.2 * exp(-0.002 * i)
 
             a = clamp(ε + quant.π_(s)[1], -1, 1)
-            capital_allocation = current_capital * min(abs(a), .3)
+            capital_allocation = current_capital * abs(a)
             current_capital -= capital_allocation
 
             # Calculate reward
@@ -95,12 +97,14 @@ include("../data.jl")
             end
 
             if t == length(price_vscores) - 1
-                raw_r += current_capital - 1000
+                raw_r += 10 * (current_capital - 1000)
                 d = 1.0
             end
 
+            scaled_r = raw_r > 0 ? log10(max(raw_r, 1e-8)) : -log10(max(-raw_r, 1e-8))
 
-            add_experience!(quant, s, a, (raw_r - μ_rewards) / σ_rewards, s′, d)
+
+            add_experience!(quant, s, a, scaled_r, s′, d)
             train!(quant, 0.0001, 0.0001, 64)
         end
         
