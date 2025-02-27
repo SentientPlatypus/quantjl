@@ -40,10 +40,10 @@ include("../data.jl")
 
 
     LOOK_BACK_PERIOD = 100
-    NUM_EPISODES = 500
+    NUM_EPISODES = 200
     
-    price_data = get_historical("AAPL")[LOOK_BACK_PERIOD + 1:end] #price percent changes
-    price_vscores = get_historical_vscores("AAPL", LOOK_BACK_PERIOD) #price vscores
+    price_data = get_historical("SPY")[LOOK_BACK_PERIOD + 1:end] #price percent changes
+    price_vscores = get_historical_vscores("SPY", LOOK_BACK_PERIOD) #price vscores
     
     for i in 1:NUM_EPISODES
 
