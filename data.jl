@@ -7,7 +7,7 @@ function get_historical(ticker::String)
     #run(`python download.py $ticker`)
     
     df = CSV.read("data/$ticker.csv", DataFrame)
-    change_percent = map(row -> Float64(row.changePercent), eachrow(df))
+    change_percent = map(row -> Float64(row.changeClosePercent), eachrow(df))
     return reverse(change_percent)
 end
 
@@ -25,4 +25,22 @@ function get_historical_vscores(ticker::String, OBS::Int=100, EPOCH::Int=1000, E
     return vscore(raw, OBS, EPOCH, EXT)
 end
 
+mutable struct OUNoise
+    θ::Float64
+    μ::Float64
+    σ::Float64
+    dt::Float64
+    x_prev::Float64
+end
+
+function OUNoise(; θ=0.15, μ=0.0, σ=0.2, dt=1.0)
+    return OUNoise(θ, μ, σ, dt, 0.0)
+end
+
+function sample!(noise::OUNoise)
+    x = noise.x_prev + noise.θ * (noise.μ - noise.x_prev) * noise.dt +
+        noise.σ * sqrt(noise.dt) * randn()
+    noise.x_prev = x
+    return x
+end
 

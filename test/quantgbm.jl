@@ -3,6 +3,8 @@ using Random
 using UnicodePlots
 using Plots
 using Statistics
+
+include("../data.jl")
 include("../quant.jl")
 include("../data.jl")
 
@@ -44,6 +46,7 @@ include("../data.jl")
     
     price_data = get_historical("SPY")[LOOK_BACK_PERIOD + 1:end] #price percent changes
     price_vscores = get_historical_vscores("SPY", LOOK_BACK_PERIOD) #price vscores
+    ou_noise = OUNoise(θ=0.15, μ=0.0, σ=0.2, dt=1.0) # Initialize OU noise
     
     for i in 1:NUM_EPISODES
 
@@ -66,9 +69,10 @@ include("../data.jl")
             s = vcat(price_vscores[t - LOOK_BACK_PERIOD + 1:t], [log10(current_capital)])
         
             # Generate action 
-            ε = (i <= 100 ) ? randn() * .4 : randn() * 0.2 * exp(-0.002 * i)
+            ε = sample!(ou_noise)
+            a = clamp(quant.π_(s)[1] + ε, -1, 1)
+            ou_noise.σ *= exp(-0.002)
 
-            a = clamp(ε + quant.π_(s)[1], -1, 1)
             capital_allocation = current_capital * abs(a)
             current_capital -= capital_allocation
 
@@ -92,10 +96,13 @@ include("../data.jl")
             total_reward += raw_r 
         
             if current_capital < 700.0
-                raw_r -= 500
-                d = 1.0
+                penalty = 500 * (700.0 - current_capital) / 700.0
+                raw_r -= penalty
+                if current_capital < 650.0
+                    d = 1.0
+                end
             end
-
+    
             if t == length(price_vscores) - 1
                 raw_r += 10 * (current_capital - 1000)
                 d = 1.0

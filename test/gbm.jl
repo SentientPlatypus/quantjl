@@ -12,6 +12,7 @@ using Plots
     gbm_path2 = vscore(percent_change)
     plot(gbm_path2[end - 1000:end], title="GBM Path", xlabel="Time", ylabel="Value")
     savefig("plots/gbm_path2.png")
+
 end
 
 
@@ -40,6 +41,10 @@ end
     
     # Compute GBM vscores based on the lookback period
     gbm_path2 = get_historical_vscores("SPY", LOOK_BACK_PERIOD)
+
+
+    gbm_path2 = gbm_path2[end - 100:end]
+    percent_change = percent_change[end - 100:end]
 
     # Initialize portfolio parameters
     initial_capital = 1000.0
@@ -88,6 +93,9 @@ end
     plot(capital_over_time, title="Trading with GBM vscore (No Trades in Last 10 Days)",
          xlabel="Time", ylabel="Capital")
     savefig("plots/gbm_trading_simulation.png")
+    plot(gbm_path2, title="GBM Path vs percent change", xlabel="Time", ylabel="Value")
+    plot!(percent_change, label="percent_change", linestyle=:dash, color=:red)
+    savefig("plots/gbm_path vs percent_change.png")
 end
 
 
