@@ -43,8 +43,8 @@ end
     gbm_path2 = get_historical_vscores("SPY", LOOK_BACK_PERIOD)
 
 
-    gbm_path2 = gbm_path2[end - 100:end]
-    percent_change = percent_change[end - 100:end]
+    gbm_path2 = gbm_path2[end - 6000:end]
+    percent_change = percent_change[end - 6000:end]
 
     # Initialize portfolio parameters
     initial_capital = 1000.0
@@ -65,24 +65,33 @@ end
         total_value = capital + position * share_price
 
         # Only execute a trade if no trade has been made in the past 10 days.
-        if i - last_trade_day >= 10
+        if i - last_trade_day >= 1
+            # Use the ±2 threshold as a trigger, but compute a fraction based on how far past the threshold we are.
             if gbm_path2[i] > 2 && position > 0
-                # If vscore > 2 and we hold a long position, sell 30% of the portfolio's value.
-                sell_value = 0.4 * total_value        # 30% of the portfolio value
-                sell_shares = sell_value / share_price  # Convert value to number of shares
-                sell_shares = min(sell_shares, position)  # Do not sell more than we own
-
-                capital += sell_shares * share_price  # Increase cash by sale proceeds
-                position -= sell_shares               # Decrease our position
-                last_trade_day = i                    # Update last trade day
+                # For scores above 2, compute a fraction to sell.
+                # For example, if gbm_path2[i] == 2, fraction is 0; if it reaches 6, fraction is 1 (or capped).
+                fraction_to_sell = clamp((gbm_path2[i] - 2) / 4, 0, 1)
+                # Use that fraction to determine the sell value. (You can adjust the base fraction if needed.)
+                sell_value = fraction_to_sell * total_value  
+                sell_shares = sell_value / share_price
+                sell_shares = min(sell_shares, position)
+                
+                capital += sell_shares * share_price
+                position -= sell_shares
+                last_trade_day = i
             elseif gbm_path2[i] < -2
-                # If vscore < -2, buy as many shares as possible with available cash.
-                buy_shares = capital / share_price
-                position += buy_shares  # Increase position by the shares purchased
-                capital = 0           # All cash is invested
-                last_trade_day = i    # Update last trade day
+                # For scores below -2, compute a fraction to invest.
+                fraction_to_buy = clamp((-gbm_path2[i] - 2) / 4, 0, 1)
+                # Instead of investing all available cash, invest only a fraction.
+                invest_cash = fraction_to_buy * capital
+                buy_shares = invest_cash / share_price
+                
+                position += buy_shares
+                capital -= invest_cash
+                last_trade_day = i
             end
         end
+        
 
         # Recalculate portfolio value after potential trading.
         total_value = capital + position * share_price
@@ -92,6 +101,8 @@ end
     # Plot the capital trajectory over time.
     plot(capital_over_time, title="Trading with GBM vscore (No Trades in Last 10 Days)",
          xlabel="Time", ylabel="Capital")
+    benchmark_capital_traj = 1000 * cumprod(1 .+ percent_change ./ 100)
+    plot!(benchmark_capital_traj, label="Benchmark", lw=2)
     savefig("plots/gbm_trading_simulation.png")
     plot(gbm_path2, title="GBM Path vs percent change", xlabel="Time", ylabel="Value")
     plot!(percent_change, label="percent_change", linestyle=:dash, color=:red)
