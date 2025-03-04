@@ -10,7 +10,7 @@ using Plots
     Random.seed!(3)
     percent_change = get_historical_raw("SPY")
     gbm_path2 = vscore(percent_change)
-    plot(gbm_path2[end - 1000:end], title="GBM Path", xlabel="Time", ylabel="Value")
+    plot(gbm_path2[end - 360:end], title="GBM Path", xlabel="Time", ylabel="Value")
     savefig("plots/gbm_path2.png")
 
 end
@@ -32,81 +32,88 @@ end
 end
 
 
-@testset "GBM Hardcoded test" begin
-    Random.seed!(3)  # Ensure reproducibility
-    LOOK_BACK_PERIOD = 100
+@testset "GBM Hardcoded Test" begin
+    using Random, Plots
 
-    # Get historical percent changes for SPY starting after the lookback period
+    # Ensure reproducibility
+    Random.seed!(3)
+
+    # Constants
+    LOOK_BACK_PERIOD = 60
+    GRAPH_LENGTH = 365
+    INITIAL_CAPITAL = 1000.0
+    TRADE_COOLDOWN = 1  # Days between trades
+    SELL_THRESHOLD = 2
+    BUY_THRESHOLD = -2
+
+    # Load historical data
     percent_change = get_historical("SPY")[LOOK_BACK_PERIOD + 1:end]
-    
-    # Compute GBM vscores based on the lookback period
-    gbm_path2 = get_historical_vscores("SPY", LOOK_BACK_PERIOD)
+    real_price = get_historical_raw("SPY")[LOOK_BACK_PERIOD + 1:end]
+    gbm_scores = get_historical_vscores("SPY", LOOK_BACK_PERIOD)
 
+    # Trim data to the desired length
+    real_price = real_price[end - GRAPH_LENGTH:end]
+    gbm_scores = gbm_scores[end - GRAPH_LENGTH:end]
+    percent_change = percent_change[end - GRAPH_LENGTH:end]
 
-    gbm_path2 = gbm_path2[end - 6000:end]
-    percent_change = percent_change[end - 6000:end]
+    # Initialize portfolio tracking
+    capital = INITIAL_CAPITAL
+    position = 0.0  # Number of shares held
+    share_price = 100.0  # Assumed starting price
+    portfolio_value = Float64[]
+    capital_over_time = Float64[]
+    last_trade_day = -10  # Allow trading on the first day
 
-    # Initialize portfolio parameters
-    initial_capital = 1000.0
-    capital = initial_capital
-    position = 0.0            # Number of shares held (positive for long, negative for short)
-    share_price = 100.0       # Assumed starting price of SPY
-    capital_over_time = Float64[]  # To track portfolio value over time
-
-    # Track the day index of the last trade.
-    # Initialized to -10 so that a trade can occur on the first day (i - (-10) = i+10 >= 10 for i>=0).
-    last_trade_day = -10
-
-    for i in 1:length(gbm_path2)
-        # Update share price based on the day's percent change.
+    # Trading simulation
+    for i in 1:length(gbm_scores)
+        # Update share price based on percent change
         share_price *= (1 + percent_change[i] / 100)
-
-        # Compute current portfolio value: cash + (shares held * current share price)
         total_value = capital + position * share_price
 
-        # Only execute a trade if no trade has been made in the past 10 days.
-        if i - last_trade_day >= 1
-            # Use the ±2 threshold as a trigger, but compute a fraction based on how far past the threshold we are.
-            if gbm_path2[i] > 2 && position > 0
-                # For scores above 2, compute a fraction to sell.
-                # For example, if gbm_path2[i] == 2, fraction is 0; if it reaches 6, fraction is 1 (or capped).
-                fraction_to_sell = clamp((gbm_path2[i] - 2) / 4, 0, 1)
-                # Use that fraction to determine the sell value. (You can adjust the base fraction if needed.)
+
+        # Trading logic (ensure cooldown period)
+        if i - last_trade_day >= TRADE_COOLDOWN
+            if gbm_scores[i] > SELL_THRESHOLD && position > 0
+                println("Sell signal at day $i: gbm_scores[$i] = $(gbm_scores[i])")
+                fraction_to_sell = min(1, 0.4 + 0.6 * (gbm_scores[i] - 2))
                 sell_value = fraction_to_sell * total_value  
-                sell_shares = sell_value / share_price
-                sell_shares = min(sell_shares, position)
-                
+                sell_shares = min(sell_value / share_price, position)
+
                 capital += sell_shares * share_price
                 position -= sell_shares
                 last_trade_day = i
-            elseif gbm_path2[i] < -2
-                # For scores below -2, compute a fraction to invest.
-                fraction_to_buy = clamp((-gbm_path2[i] - 2) / 4, 0, 1)
-                # Instead of investing all available cash, invest only a fraction.
+            elseif gbm_scores[i] < BUY_THRESHOLD
+                fraction_to_buy = 1  # Can be adjusted dynamically
                 invest_cash = fraction_to_buy * capital
                 buy_shares = invest_cash / share_price
-                
+
                 position += buy_shares
                 capital -= invest_cash
                 last_trade_day = i
             end
         end
-        
 
-        # Recalculate portfolio value after potential trading.
-        total_value = capital + position * share_price
-        push!(capital_over_time, total_value)
+        # Track portfolio value
+        push!(capital_over_time, capital)
+        push!(portfolio_value, capital + position * share_price)
     end
 
-    # Plot the capital trajectory over time.
-    plot(capital_over_time, title="Trading with GBM vscore (No Trades in Last 10 Days)",
-         xlabel="Time", ylabel="Capital")
-    benchmark_capital_traj = 1000 * cumprod(1 .+ percent_change ./ 100)
-    plot!(benchmark_capital_traj, label="Benchmark", lw=2)
+    # Generate plots
+    p1 = plot(portfolio_value, title="Trading with GBM vscore", xlabel="Time", ylabel="Capital")
+    benchmark_capital = INITIAL_CAPITAL * cumprod(1 .+ percent_change ./ 100)
+    plot!(benchmark_capital, label="Benchmark", lw=2)
+
+    p2 = plot(gbm_scores, title="GBM Path", xlabel="Time", ylabel="Value")
+    p3 = plot(real_price, title="Real Price", xlabel="Time", ylabel="Value", label="Real Price", color=:red)
+    p4 = plot(percent_change, title="Percent Change", xlabel="Time", ylabel="Value", label="Percent Change", color=:blue)
+    p5 = plot(capital_over_time, title="Capital Over Time", xlabel="Time", ylabel="Value", label="Capital Over Time", color=:green)
+
+    # Save plots
+    plot(p1, p2, layout=(2,1), size=(800, 600), legend=:topright)
     savefig("plots/gbm_trading_simulation.png")
-    plot(gbm_path2, title="GBM Path vs percent change", xlabel="Time", ylabel="Value")
-    plot!(percent_change, label="percent_change", linestyle=:dash, color=:red)
-    savefig("plots/gbm_path vs percent_change.png")
+
+    plot(p2, p3, p4, p5, layout=(4,1), size=(800, 900))
+    savefig("plots/gbm_analysis.png")
 end
 
 
