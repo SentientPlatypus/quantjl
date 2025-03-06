@@ -8,7 +8,7 @@ using Plots
 
 @testset "GBM NEW" begin
     Random.seed!(3)
-    percent_change = get_historical_raw("SPY")
+    percent_change = get_historical_raw("AAPL")
     gbm_path2 = vscore(percent_change)
     plot(gbm_path2[end - 360:end], title="GBM Path", xlabel="Time", ylabel="Value")
     savefig("plots/gbm_path2.png")
@@ -18,16 +18,16 @@ end
 
 @testset "PATH 1000" begin
     Random.seed!(3)
-    raw = get_historical_raw("SPY")
-    plot(raw, title="SPY_RAW", xlabel="Time", ylabel="Value")
+    raw = get_historical_raw("AAPL")
+    plot(raw, title="AAPL_RAW", xlabel="Time", ylabel="Value")
     savefig("plots/appl_1000_raw.png")
 end
 
 
 @testset "PATH_percent 1000" begin
     Random.seed!(3)
-    percent_change = get_historical("SPY")
-    plot(percent_change, title="SPY_RAW", xlabel="Time", ylabel="Value")
+    percent_change = get_historical("AAPL")
+    plot(percent_change, title="AAPL_RAW", xlabel="Time", ylabel="Value")
     savefig("plots/appl_1000_pct_change.png")
 end
 
@@ -40,16 +40,16 @@ end
 
     # Constants
     LOOK_BACK_PERIOD = 60
-    GRAPH_LENGTH = 365
+    GRAPH_LENGTH = 1000
     INITIAL_CAPITAL = 1000.0
-    TRADE_COOLDOWN = 1  # Days between trades
+    TRADE_COOLDOWN = 5  # Days between trades
     SELL_THRESHOLD = 2
     BUY_THRESHOLD = -2
 
     # Load historical data
-    percent_change = get_historical("SPY")[LOOK_BACK_PERIOD + 1:end]
-    real_price = get_historical_raw("SPY")[LOOK_BACK_PERIOD + 1:end]
-    gbm_scores = get_historical_vscores("SPY", LOOK_BACK_PERIOD)
+    percent_change = get_historical("AAPL")[LOOK_BACK_PERIOD + 1:end]
+    real_price = get_historical_raw("AAPL")[LOOK_BACK_PERIOD + 1:end]
+    gbm_scores = get_historical_vscores("AAPL", LOOK_BACK_PERIOD)
 
     # Trim data to the desired length
     real_price = real_price[end - GRAPH_LENGTH:end]
@@ -74,14 +74,15 @@ end
         # Trading logic (ensure cooldown period)
         if i - last_trade_day >= TRADE_COOLDOWN
             if gbm_scores[i] > SELL_THRESHOLD && position > 0
-                println("Sell signal at day $i: gbm_scores[$i] = $(gbm_scores[i])")
-                fraction_to_sell = min(1, 0.4 + 0.6 * (gbm_scores[i] - 2))
+                
+                fraction_to_sell = 0.4
                 sell_value = fraction_to_sell * total_value  
                 sell_shares = min(sell_value / share_price, position)
 
                 capital += sell_shares * share_price
                 position -= sell_shares
                 last_trade_day = i
+                println("Capital: $capital signal at day $i: gbm_scores[$i] = $(gbm_scores[i])")
             elseif gbm_scores[i] < BUY_THRESHOLD
                 fraction_to_buy = 1  # Can be adjusted dynamically
                 invest_cash = fraction_to_buy * capital
