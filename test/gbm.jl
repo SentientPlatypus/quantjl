@@ -40,9 +40,9 @@ end
 
     # Constants
     LOOK_BACK_PERIOD = 60
-    GRAPH_LENGTH = 1000
+    GRAPH_LENGTH = 360
     INITIAL_CAPITAL = 1000.0
-    TRADE_COOLDOWN = 5  # Days between trades
+    TRADE_COOLDOWN = 1  # Days between trades
     SELL_THRESHOLD = 2
     BUY_THRESHOLD = -2
 
