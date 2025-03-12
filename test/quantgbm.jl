@@ -26,7 +26,7 @@ include("../data.jl")
               Layer(16, 1, my_tanh, my_tanh′)], mse_loss, mse_loss′)
 
     γ = 0.95
-    τ = 0.1
+    τ = 0.15
     quant = Quant(π_, Q̂, γ, τ)
 
     total_rewards = Float64[]
