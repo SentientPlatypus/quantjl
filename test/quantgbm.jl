@@ -127,7 +127,7 @@ include("../data.jl")
             Plots.plot!(benchmark_capital_traj, label="Benchmark (Buy & Hold)", linestyle=:dash, color=:red, lw=2)
 
             # Save the figure
-            Plots.savefig("plots/capital_distribution/higher_gamma_reward_over1000/episode_$(i).png")
+            Plots.savefig("plots/capital_distribution/higher_tau/episode_$(i).png")
         end
 
         push!(total_rewards, total_reward)
