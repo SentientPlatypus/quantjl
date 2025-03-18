@@ -14,6 +14,8 @@ sigmoid′(x) = sigmoid(x) .* (1 .- sigmoid(x))
 my_tanh(x) = tanh.(x)
 my_tanh′(x) = 1 .- my_tanh.(x).^2
 
+idty(x) = x
+idty′(x) = 1.0
 
 ## LOSS FUNCTIONS
 mse_loss(ŷ, y) = sum((ŷ - y).^2)
