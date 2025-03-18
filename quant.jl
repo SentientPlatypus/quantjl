@@ -88,10 +88,6 @@ function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
         quant.π_.L′ = (ŷ, y) -> -action_grad  # DDPG uses gradient ascent on policy
         back_custom!(quant.π_, s, -action_grad, α, λ, 1/batch_size)
         
-        # Add gradient clipping after backpropagation
-        clip_gradients!(quant.π_, 1.0)
-        clip_gradients!(quant.Q_, 1.0)
-        
         # Update priorities based on TD error
         if !isempty(quant.priorities)
             Q_pred = quant.Q_(vcat(s, a))
@@ -105,7 +101,7 @@ function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
     update_target_network!(quant.Q_target, quant.Q_, quant.τ)
 end
 
-function train_old!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
+function train_exp!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
     """Train the Quant agent using a minibatch from the replay buffer"""
     if length(quant.replay_buffer) < batch_size 
         return  

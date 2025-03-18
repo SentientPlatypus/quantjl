@@ -81,6 +81,7 @@ end
         d = 0.0
         episode_length = 0
 
+        actions = []
 
         for t in LOOK_BACK_PERIOD:length(price_vscores) - 1
             if d == 1.0
@@ -95,6 +96,7 @@ end
             # Generate action 
             ε = sample!(ou_noise)
             a = clamp(quant.π_(s)[1] + ε, -1, 1)
+            push!(actions, a)
             ou_noise.σ = max(0.05, ou_noise.σ * exp(-0.0005))
 
             capital_allocation = current_capital * abs(a)
@@ -137,12 +139,15 @@ end
             benchmark_capital_traj = 1000 * cumprod(1 .+ price_data[LOOK_BACK_PERIOD:LOOK_BACK_PERIOD+episode_length-1] ./ 100)
 
             # Plot agent's capital trajectory
-            Plots.plot(capitals[end - episode_length + 1:end], title="Episode $i Capital over time", 
+            capital_plot = plot(capitals[end - episode_length + 1:end], title="Episode $i Capital over time", 
                     xlabel="Time", ylabel="Capital", label="Agent", lw=2)
 
             # Overlay benchmark trajectory (Buy & Hold)
-            Plots.plot!(benchmark_capital_traj, label="Benchmark (Buy & Hold)", linestyle=:dash, color=:red, lw=2)
+            plot!(capital_plot, benchmark_capital_traj, label="Benchmark (Buy & Hold)", linestyle=:dash, color=:red, lw=1)
 
+            action_plot = plot(actions, title="Actions over time", xlabel="Time", ylabel="Action", label="Actions", lw=1)
+
+            final_plot = plot(capital_plot, action_plot, layout=(2,1), size=(800,600))
             # Save the figure
             Plots.savefig("plots/capital_distribution/higher_tau/episode_$(i).png")
         end
