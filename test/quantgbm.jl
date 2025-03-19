@@ -39,7 +39,7 @@ end
               Layer(80, 64, relu, relu′),
               Layer(64, 32, relu, relu′),
               Layer(32, 16, relu, relu′),
-              Layer(16, 1, my_tanh, my_tanh′)], mse_loss, mse_loss′)
+              Layer(16, 1, idty, idty′)], mse_loss, mse_loss′)
 
     Q̂ = Net([ Layer(102, 80, relu, relu′),  # State + Action as input
               Layer(80, 64, relu, relu′),
@@ -66,8 +66,8 @@ end
     LOOK_BACK_PERIOD = 100
     NUM_EPISODES = 200
     
-    price_data = get_historical("SPY")[LOOK_BACK_PERIOD + 1:end] #price percent changes
-    price_vscores = get_historical_vscores("SPY", LOOK_BACK_PERIOD) #price vscores
+    price_data = get_historical("AAPL")[LOOK_BACK_PERIOD + 1:end] #price percent changes
+    price_vscores = get_historical_vscores("AAPL", LOOK_BACK_PERIOD) #price vscores
     ou_noise = OUNoise(θ=0.15, μ=0.0, σ=0.2, dt=1.0) # Initialize OU noise
 
     recent_returns = Float64[]
@@ -140,7 +140,7 @@ end
 
             # Plot agent's capital trajectory
             capital_plot = plot(capitals[end - episode_length + 1:end], title="Episode $i Capital over time", 
-                    xlabel="Time", ylabel="Capital", label="Agent", lw=2)
+                    xlabel="Time", ylabel="Capital", label="Agent", lw=1)
 
             # Overlay benchmark trajectory (Buy & Hold)
             plot!(capital_plot, benchmark_capital_traj, label="Benchmark (Buy & Hold)", linestyle=:dash, color=:red, lw=1)
