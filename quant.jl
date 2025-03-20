@@ -43,7 +43,7 @@ function update_target_network!(target_net::Net, main_net::Net, τ::Float64)
     end
 end
 
-function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
+function train_exp!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
     """Train the Quant agent using a minibatch from the replay buffer"""
     if length(quant.replay_buffer) < batch_size 
         return  
@@ -101,7 +101,7 @@ function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
     update_target_network!(quant.Q_target, quant.Q_, quant.τ)
 end
 
-function train_exp!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
+function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
     """Train the Quant agent using a minibatch from the replay buffer"""
     if length(quant.replay_buffer) < batch_size 
         return  

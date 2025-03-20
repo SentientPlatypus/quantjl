@@ -64,7 +64,7 @@ end
 
 
     LOOK_BACK_PERIOD = 100
-    NUM_EPISODES = 200
+    NUM_EPISODES = 1000
     
     price_data = get_historical("AAPL")[LOOK_BACK_PERIOD + 1:end] #price percent changes
     price_vscores = get_historical_vscores("AAPL", LOOK_BACK_PERIOD) #price vscores
@@ -77,60 +77,70 @@ end
         println("Episode: $i")
 
         current_capital = 1000.0
-        total_reward = 0;
+        total_reward = 0.0
         d = 0.0
         episode_length = 0
-
+        
+        # Track current allocation
+        current_market_allocation = 0.0  # Start with 0% allocated (all cash)
         actions = []
-
+    
         for t in LOOK_BACK_PERIOD:length(price_vscores) - 1
             if d == 1.0
                 break
             end
-
+    
             episode_length += 1
-
+    
             # Normalize state
             s = vcat(price_vscores[t - LOOK_BACK_PERIOD + 1:t], [log10(current_capital)])
         
-            # Generate action 
+            # Generate action (target allocation)
             ε = sample!(ou_noise)
-            a = clamp(quant.π_(s)[1] + ε, -1, 1)
-            push!(actions, a)
+            target_allocation = clamp(quant.π_(s)[1] + ε, -1, 1)
+            push!(actions, target_allocation)
             ou_noise.σ = max(0.05, ou_noise.σ * exp(-0.0005))
-
-            capital_allocation = current_capital * abs(a)
+    
+            # Calculate change in allocation
+            allocation_change = target_allocation - current_market_allocation
+            
+            # Apply market impact/transaction costs (optional)
+            transaction_cost = 0.001 * abs(allocation_change) * current_capital
+            current_capital -= transaction_cost
+            
+            # Record capital before market moves
             prev_capital = current_capital
-            current_capital -= capital_allocation
-
-            # Calculate reward
+            
+            # Apply market movement to existing allocation
             percent_change = price_data[t + 1]
-            raw_r = (a > 0.0 ? 1 : -1) * capital_allocation * (percent_change / 100.0)
+            market_return = current_market_allocation * current_capital * (percent_change / 100.0)
+            current_capital += market_return
+            
+            # Update allocation for next step
+            current_market_allocation = target_allocation
+            
+            # Calculate reward
+            raw_r = market_return - transaction_cost
             push!(rewards, raw_r)
-
             push!(recent_returns, raw_r / prev_capital)  # Store return as percentage
-            if length(recent_returns) > 100  # Keep a rolling window
+            if length(recent_returns) > 100
                 popfirst!(recent_returns)
             end
-
-            #println("CAPITAL BEFORE: $(current_capital+capital_allocation) ACTION: $a $(a < 0 ? "SHORT" : "LONG"): $capital_allocation PRICE CHANGE: $percent_change REWARD: $raw_r")
-            current_capital += raw_r + capital_allocation
-
+    
             push!(capitals, current_capital)
             μ_capital = mean(capitals)
             σ_capital = std(capitals)
-
-
+    
             s′ = vcat(price_vscores[t - LOOK_BACK_PERIOD + 2:t + 1], [log10(current_capital)])
-
+    
             total_reward += raw_r 
         
             if current_capital < 650.0 || t == length(price_vscores) - 1
                 d = 1.0
             end
-
+    
             better_r = calculate_better_reward(raw_r, current_capital, prev_capital, 20, recent_returns)
-            add_experience!(quant, s, a, better_r, s′, d)
+            add_experience!(quant, s, target_allocation, better_r, s′, d)
             train!(quant, 0.0001, 0.0001, 64)
         end
         
@@ -149,7 +159,7 @@ end
 
             final_plot = plot(capital_plot, action_plot, layout=(2,1), size=(800,600))
             # Save the figure
-            Plots.savefig("plots/capital_distribution/old_method_with_actions/episode_$(i).png")
+            Plots.savefig("plots/capital_distribution/position_holding/episode_$(i).png")
         end
 
         push!(total_rewards, total_reward)
