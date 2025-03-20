@@ -55,8 +55,7 @@ end
 
 
     capitals = 1000 .+ 200 .* randn(100)
-    μ_capital = mean(capitals) # Initial capital in log space
-    σ_capital = std(capitals)         # Assume a reasonable standard deviation (can be tuned)
+
 
     rewards = randn(100)
     μ_rewards = mean(rewards) 
@@ -64,13 +63,13 @@ end
 
 
     LOOK_BACK_PERIOD = 100
-    NUM_EPISODES = 1000
+    NUM_EPISODES = 200
     
     price_data = get_historical("AAPL")[LOOK_BACK_PERIOD + 1:end] #price percent changes
     price_vscores = get_historical_vscores("AAPL", LOOK_BACK_PERIOD) #price vscores
     ou_noise = OUNoise(θ=0.15, μ=0.0, σ=0.2, dt=1.0) # Initialize OU noise
 
-    recent_returns = Float64[]
+    
     
     for i in 1:NUM_EPISODES
 
@@ -84,8 +83,9 @@ end
         # Track current allocation
         current_market_allocation = 0.0  # Start with 0% allocated (all cash)
         actions = []
-    
-        for t in LOOK_BACK_PERIOD:length(price_vscores) - 1
+        recent_returns = Float64[]
+        start_t = rand(LOOK_BACK_PERIOD:length(price_vscores) - 100)
+        for t in start_t:length(price_vscores) - 1
             if d == 1.0
                 break
             end
@@ -98,7 +98,7 @@ end
             # Generate action (target allocation)
             ε = sample!(ou_noise)
             target_allocation = clamp(quant.π_(s)[1] + ε, -1, 1)
-            push!(actions, target_allocation)
+            push!(actions, quant.π_(s))
             ou_noise.σ = max(0.05, ou_noise.σ * exp(-0.0005))
     
             # Calculate change in allocation
@@ -128,8 +128,6 @@ end
             end
     
             push!(capitals, current_capital)
-            μ_capital = mean(capitals)
-            σ_capital = std(capitals)
     
             s′ = vcat(price_vscores[t - LOOK_BACK_PERIOD + 2:t + 1], [log10(current_capital)])
     
@@ -146,7 +144,7 @@ end
         
         if i % 20 == 0 || i == 1
             # Compute benchmark capital over the same episode length
-            benchmark_capital_traj = 1000 * cumprod(1 .+ price_data[LOOK_BACK_PERIOD:LOOK_BACK_PERIOD+episode_length-1] ./ 100)
+            benchmark_capital_traj = 1000 * cumprod(1 .+ price_data[start_t:start_t+episode_length-1] ./ 100)
 
             # Plot agent's capital trajectory
             capital_plot = plot(capitals[end - episode_length + 1:end], title="Episode $i Capital over time", 
