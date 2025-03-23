@@ -40,16 +40,16 @@ end
 
     # Constants
     LOOK_BACK_PERIOD = 60
-    GRAPH_LENGTH = 360
+    GRAPH_LENGTH = 600
     INITIAL_CAPITAL = 1000.0
     TRADE_COOLDOWN = 1  # Days between trades
     SELL_THRESHOLD = 2
     BUY_THRESHOLD = -2
 
     # Load historical data
-    percent_change = get_historical("AAPL")[LOOK_BACK_PERIOD + 1:end]
-    real_price = get_historical_raw("AAPL")[LOOK_BACK_PERIOD + 1:end]
-    gbm_scores = get_historical_vscores("AAPL", LOOK_BACK_PERIOD)
+    percent_change = get_historical("MSFT")[LOOK_BACK_PERIOD + 1:end]
+    real_price = get_historical_raw("MSFT")[LOOK_BACK_PERIOD + 1:end]
+    gbm_scores = get_historical_vscores("MSFT", LOOK_BACK_PERIOD)
 
     # Trim data to the desired length
     real_price = real_price[end - GRAPH_LENGTH:end]

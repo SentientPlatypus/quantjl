@@ -85,6 +85,7 @@ end
         actions = []
         recent_returns = Float64[]
         start_t = rand(LOOK_BACK_PERIOD:length(price_vscores) - 100)
+        
         for t in start_t:length(price_vscores) - 1
             if d == 1.0
                 break
