@@ -40,11 +40,11 @@ end
 
     # Constants
     LOOK_BACK_PERIOD = 60
-    GRAPH_LENGTH = 600
+    GRAPH_LENGTH = 200
     INITIAL_CAPITAL = 1000.0
     TRADE_COOLDOWN = 1  # Days between trades
-    SELL_THRESHOLD = 2
-    BUY_THRESHOLD = -2
+    SELL_THRESHOLD = 1
+    BUY_THRESHOLD = -1
 
     # Load historical data
     percent_change = get_historical("MSFT")[LOOK_BACK_PERIOD + 1:end]

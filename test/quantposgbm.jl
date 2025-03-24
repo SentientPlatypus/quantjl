@@ -65,8 +65,8 @@ end
     LOOK_BACK_PERIOD = 100
     NUM_EPISODES = 200
     
-    price_data = get_historical("AAPL")[LOOK_BACK_PERIOD + 1:end] #price percent changes
-    price_vscores = get_historical_vscores("AAPL", LOOK_BACK_PERIOD) #price vscores
+    price_data = get_historical("SPY")[LOOK_BACK_PERIOD + 1:end] #price percent changes
+    price_vscores = get_historical_vscores("SPY", LOOK_BACK_PERIOD) #price vscores
     ou_noise = OUNoise(θ=0.15, μ=0.0, σ=0.2, dt=1.0) # Initialize OU noise
 
     
@@ -99,7 +99,7 @@ end
             # Generate action (target allocation)
             ε = sample!(ou_noise)
             target_allocation = clamp(quant.π_(s)[1] + ε, -1, 1)
-            push!(actions, quant.π_(s))
+            push!(actions, quant.π_(s)[1])
             ou_noise.σ = max(0.05, ou_noise.σ * exp(-0.0005))
     
             # Calculate change in allocation
@@ -153,12 +153,12 @@ end
 
             # Overlay benchmark trajectory (Buy & Hold)
             plot!(capital_plot, benchmark_capital_traj, label="Benchmark (Buy & Hold)", linestyle=:dash, color=:red, lw=1)
-
+            
             action_plot = plot(actions, title="Actions over time", xlabel="Time", ylabel="Action", label="Actions", lw=1)
 
             final_plot = plot(capital_plot, action_plot, layout=(2,1), size=(800,600))
             # Save the figure
-            Plots.savefig("plots/capital_distribution/position_holding/episode_$(i).png")
+            Plots.savefig("plots/capital_distribution/high_frequency/episode_$(i).png")
         end
 
         push!(total_rewards, total_reward)

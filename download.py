@@ -61,6 +61,8 @@ def read_historical(tickers:list, apikey):
 
 
 def read_high_frequency(tickers:list, apikey):
+    "https://financialmodelingprep.com/api/v3/historical-chart/1min/MSFT?from=2023-08-10&to=2023-09-10&apikey=LQ4Ifyu8MVzmtmXbL5e6pKte89lZhXcT"
+
     df = pd.DataFrame()
     for ticker in tickers:
         # Build the URL for downloading high-frequency data
@@ -69,6 +71,8 @@ def read_high_frequency(tickers:list, apikey):
             url += "/{}?apikey={}".format("USD" + ticker[:-2], apikey)
         else:
             url += "/{}?apikey={}".format(ticker, apikey)
+
+        print("URL: ", url)
         
         json_data = get_jsonparsed_data(url)
         
