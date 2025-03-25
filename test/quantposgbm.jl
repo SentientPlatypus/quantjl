@@ -57,16 +57,14 @@ end
     capitals = 1000 .+ 200 .* randn(100)
 
 
-    rewards = randn(100)
-    μ_rewards = mean(rewards) 
-    σ_rewards = std(rewards)     
+    rewards = randn(100) 
 
 
     LOOK_BACK_PERIOD = 100
     NUM_EPISODES = 200
     
-    price_data = get_historical("SPY")[LOOK_BACK_PERIOD + 1:end] #price percent changes
-    price_vscores = get_historical_vscores("SPY", LOOK_BACK_PERIOD) #price vscores
+    price_data = get_historical("MSFT")[LOOK_BACK_PERIOD + 1:end] #price percent changes
+    price_vscores = get_historical_vscores("MSFT", LOOK_BACK_PERIOD) #price vscores
     ou_noise = OUNoise(θ=0.15, μ=0.0, σ=0.2, dt=1.0) # Initialize OU noise
 
     
@@ -99,7 +97,7 @@ end
             # Generate action (target allocation)
             ε = sample!(ou_noise)
             target_allocation = clamp(quant.π_(s)[1] + ε, -1, 1)
-            push!(actions, quant.π_(s)[1])
+            push!(actions, quant.π_(s)[1]) 
             ou_noise.σ = max(0.05, ou_noise.σ * exp(-0.0005))
     
             # Calculate change in allocation

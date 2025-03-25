@@ -66,8 +66,8 @@ end
     LOOK_BACK_PERIOD = 100
     NUM_EPISODES = 200
     
-    price_data = get_historical("AAPL")[LOOK_BACK_PERIOD + 1:end] #price percent changes
-    price_vscores = get_historical_vscores("AAPL", LOOK_BACK_PERIOD) #price vscores
+    price_data = get_historical("MSFT")[LOOK_BACK_PERIOD + 1:end] #price percent changes
+    price_vscores = get_historical_vscores("MSFT", LOOK_BACK_PERIOD) #price vscores
     ou_noise = OUNoise(θ=0.15, μ=0.0, σ=0.2, dt=1.0) # Initialize OU noise
 
     recent_returns = Float64[]
@@ -149,7 +149,7 @@ end
 
             final_plot = plot(capital_plot, action_plot, layout=(2,1), size=(800,600))
             # Save the figure
-            Plots.savefig("plots/capital_distribution/old_method_with_actions/episode_$(i).png")
+            Plots.savefig("plots/capital_distribution/high_frequency_nopos/episode_$(i).png")
         end
 
         push!(total_rewards, total_reward)
