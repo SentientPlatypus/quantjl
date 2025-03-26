@@ -42,12 +42,40 @@ def fetch_stock_data_fmp(ticker: str, period: str = "6mo"):
     df = pd.DataFrame(data["historical"])
     df["date"] = pd.to_datetime(df["date"])
     df = df.set_index("date").sort_index()
-
     return df
 
-def trainmodel(ticker:str):
+
+
+def fetch_intraday(ticker: str, interval: str = "5min"):
+    """
+    Fetch intraday stock data from Financial Modeling Prep (FMP) API.
+    Args:
+        ticker (str): Stock ticker symbol.
+        interval (str): Time interval for intraday data (e.g., "1min", "5min", "15min").
+    Returns:
+        pd.DataFrame: DataFrame containing intraday stock prices.
+    """
+    url = f"https://financialmodelingprep.com/api/v3/historical-chart/{interval}/{ticker}?apikey={FMP_API_KEY}"
+    response = requests.get(url)
+    data = response.json()
+    
+    if not data or not isinstance(data, list):  # Ensure we received a list of records
+        raise ValueError(f"Failed to fetch intraday data for {ticker}. Response: {data}")
+    
+    df = pd.DataFrame(data)
+    df["date"] = pd.to_datetime(df["date"])
+    df = df.set_index("date").sort_index()
+    return df
+
+
+def trainmodel(ticker:str, n_lookback=60, n_forecast=30, intraday=False):
+    
     toDisplay = fetch_stock_data_fmp(ticker, period="max")
     df = fetch_stock_data_fmp(ticker, period="6mo")
+
+    if intraday:
+        toDisplay = fetch_intraday(ticker)
+        df = fetch_intraday(ticker)
 
     print(df)
     y = df['close'].fillna(method='ffill')
@@ -58,9 +86,6 @@ def trainmodel(ticker:str):
     scaler = scaler.fit(y)
     y = scaler.transform(y)
 
-    # generate the input and output sequences
-    n_lookback = 60  # length of input sequences (lookback period)
-    n_forecast = 30  # length of output sequences (forecast period)
     X = []
     Y = []
     
@@ -131,7 +156,8 @@ def testmodel(model, ticker: str, test_start_date: str = None, n_lookback=60, n_
     """
     
     # Fetch the full historical data (assumed to have a DateTime index)
-    df_full = fetch_stock_data_fmp(ticker, period="max")
+    df_full = fetch_intraday(ticker)
+    print(df_full)
     
     # Ensure the index is datetime and sorted in ascending order
     if not np.issubdtype(df_full.index.dtype, np.datetime64):
@@ -149,7 +175,7 @@ def testmodel(model, ticker: str, test_start_date: str = None, n_lookback=60, n_
     # Locate the nearest date in the index to our test_start_date
     if test_start_date not in df_full.index:
         # Find the closest date
-        test_start_date = df_full.index[df_full.index.get_loc(test_start_date, method='nearest')]
+        test_start_date = df_full.index[df_full.index.get_loc(test_start_date)]
     
     # Find the integer location of the test_start_date
     test_start_idx = df_full.index.get_loc(test_start_date)
@@ -182,8 +208,8 @@ def testmodel(model, ticker: str, test_start_date: str = None, n_lookback=60, n_
     
     # Plot the forecast vs actual prices
     plt.figure(figsize=(10, 6))
-    plt.plot(actual_window.index, actual_window['close'], label='Actual Price', marker='o')
-    plt.plot(actual_window.index, forecast.flatten(), label='Forecast Price', marker='x')
+    plt.plot(df_full.index, df_full['close'], label='Actual Price')
+    plt.plot(actual_window.index, forecast.flatten(), label='Forecast Price', color='orange')
     plt.title(f"30-Day Forecast vs. Actual from {test_start_date.date()}")
     plt.xlabel("Date")
     plt.ylabel("Price")
@@ -192,30 +218,24 @@ def testmodel(model, ticker: str, test_start_date: str = None, n_lookback=60, n_
     plt.show()
 
 
-def plot_forecast(df: pd.DataFrame):
+def plot_forecast(df: pd.DataFrame, n_lookback=60, n_forecast=30):
     """
     Plots historical stock data along with the forecast.
     Highlights the last 30 forecasted open values.
     Also tests on an earlier section of data for validation.
     """
-    df = df.copy().sort_index()  # Ensure the data is sorted by date
 
+    df = df.copy().sort_index()  # Ensure the data is sorted by date
     # Extract historical and forecasted data
-    historical_data = df[df["close"].notna()].iloc[:-30]  # Past actual prices
-    forecast_data = df[df["open"].notna()].iloc[-30:]  # Last 30 forecasted open values
+    historical_data = df[df["close"].notna()].iloc[:-n_forecast]  # Past actual prices
+    forecast_data = df[df["open"].notna()].iloc[-n_forecast:]  # Last 30 forecasted open values
 
     # Plot historical data
     plt.figure(figsize=(12, 6))
     plt.plot(historical_data.index, historical_data["close"], label="Historical Data (Close)", color="blue")
-
     # Plot forecasted data
     plt.plot(forecast_data.index, forecast_data["open"], label="Forecast (Open)", color="orange")
 
-
-    # Test model on an earlier segment (last 60 days, validating last 30 days)
-    test_start = historical_data.index[-60]  # Start from 60 days before last known data
-    test_end = historical_data.index[-30]    # Take the last 30 days before forecast
-    test_segment = historical_data.loc[test_start:test_end]
 
     # Labels and legend
     plt.xlabel("Date")
@@ -228,6 +248,10 @@ def plot_forecast(df: pd.DataFrame):
     plt.show()
 
 if __name__ == "__main__":
-    model, res = trainmodel("MSFT")
+
+    n_lookback = 120
+    n_forecast = 10
+
+    model, res = trainmodel("SPY", n_lookback=n_lookback, n_forecast=n_forecast, intraday=True)
     plot_forecast(res)
-    testmodel(model, "MSFT", test_start_date="2023-01-01", n_lookback=60, n_forecast=30)
+    testmodel(model, "SPY", test_start_date="2025-1-10", n_lookback=n_lookback, n_forecast=n_forecast)
