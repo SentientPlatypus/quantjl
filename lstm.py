@@ -143,52 +143,36 @@ def trainmodel(ticker:str, n_lookback=60, n_forecast=30, intraday=False):
     return model, final
     
 
-def testmodel(model, ticker: str, test_start_date: str = None, n_lookback=60, n_forecast=30):
+def testmodel(model, ticker: str, test_start_idx: int = None, n_lookback=60, n_forecast=30):
     """
-    Tests the provided model by comparing a 30-day forecast (starting from a chosen test date)
-    with the actual historical data.
+    Tests the provided model by comparing a forecast with actual historical data using index-based selection.
     
     Parameters:
     - model: A trained Keras model for forecasting.
     - ticker: Stock ticker symbol to fetch historical data.
-    - test_start_date: Optional; a string date (e.g., "2023-01-01") indicating the forecast start date.
-                       If None, a default date is chosen to ensure sufficient data.
+    - test_start_idx: Optional; an integer index indicating the forecast start point.
+                      If None, defaults to 90 indices before the last available index.
     """
     
-    # Fetch the full historical data (assumed to have a DateTime index)
+    # Fetch full historical data (assumed to have a DateTime index but now using index-based slicing)
     df_full = fetch_intraday(ticker)
-    print(df_full)
     
-    # Ensure the index is datetime and sorted in ascending order
-    if not np.issubdtype(df_full.index.dtype, np.datetime64):
-        df_full.index = pd.to_datetime(df_full.index)
+    # Ensure the index is sorted
     df_full.sort_index(inplace=True)
     
-    # If no test start date is provided, choose one that allows for a full 60-day lookback and 30-day forecast
-    if test_start_date is None:
-        # For instance, choose 90 days before the last available date
-        last_date = df_full.index[-1]
-        test_start_date = last_date - pd.Timedelta(days=90)
-    else:
-        test_start_date = pd.to_datetime(test_start_date)
+    # If no test start index is provided, default to 90 indices before the last available one
+    if test_start_idx is None:
+        test_start_idx = len(df_full) - 90
     
-    # Locate the nearest date in the index to our test_start_date
-    if test_start_date not in df_full.index:
-        # Find the closest date
-        test_start_date = df_full.index[df_full.index.get_loc(test_start_date)]
-    
-    # Find the integer location of the test_start_date
-    test_start_idx = df_full.index.get_loc(test_start_date)
-    
-    # Check there is enough data before and after the test_start_date
+    # Ensure valid test start index
     if test_start_idx < n_lookback or test_start_idx + n_forecast > len(df_full):
-        raise ValueError("Not enough data available for testing at the specified test_start_date.")
+        raise ValueError("Not enough data available for testing at the specified test_start_idx.")
     
-    # Prepare the input: get the previous n_lookback days of 'close' prices
+    # Prepare input window: get the previous n_lookback indices of 'close' prices
     input_window = df_full.iloc[test_start_idx - n_lookback : test_start_idx]
     y_input = input_window['close'].fillna(method='ffill').values.reshape(-1, 1)
     
-    # Fit a scaler on the input window (using the same scaling method as in training)
+    # Fit a scaler on the input window (same scaling method as in training)
     scaler = MinMaxScaler(feature_range=(0, 1))
     scaler.fit(y_input)
     input_scaled = scaler.transform(y_input)
@@ -196,22 +180,22 @@ def testmodel(model, ticker: str, test_start_date: str = None, n_lookback=60, n_
     # Reshape for the model: (samples, time steps, features)
     X_input = np.array(input_scaled).reshape(1, n_lookback, 1)
     
-    # Use the trained model to forecast the next n_forecast days
+    # Predict the next n_forecast steps
     forecast_scaled = model.predict(X_input)
     forecast_scaled = forecast_scaled.reshape(-1, 1)
     
-    # Inverse transform the forecast to get actual price values
+    # Inverse transform to get actual price values
     forecast = scaler.inverse_transform(forecast_scaled)
     
-    # Get the actual prices for the forecast period from the historical data
+    # Get actual values for comparison
     actual_window = df_full.iloc[test_start_idx : test_start_idx + n_forecast]
     
     # Plot the forecast vs actual prices
     plt.figure(figsize=(10, 6))
     plt.plot(df_full.index, df_full['close'], label='Actual Price')
     plt.plot(actual_window.index, forecast.flatten(), label='Forecast Price', color='orange')
-    plt.title(f"30-Day Forecast vs. Actual from {test_start_date.date()}")
-    plt.xlabel("Date")
+    plt.title(f"Forecast vs. Actual from index {test_start_idx}")
+    plt.xlabel("Index")
     plt.ylabel("Price")
     plt.legend()
     plt.grid(True)
@@ -254,4 +238,4 @@ if __name__ == "__main__":
 
     model, res = trainmodel("SPY", n_lookback=n_lookback, n_forecast=n_forecast, intraday=True)
     plot_forecast(res)
-    testmodel(model, "SPY", test_start_date="2025-1-10", n_lookback=n_lookback, n_forecast=n_forecast)
+    testmodel(model, "SPY", n_lookback=n_lookback, n_forecast=n_forecast)
