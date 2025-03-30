@@ -65,7 +65,7 @@ end
     last_trade_day = -10  # Allow trading on the first day
 
     # Trading simulation
-    for i in 1:length(gbm_scores)
+    for i in 50:length(gbm_scores)
         # Update share price based on percent change
         share_price *= (1 + percent_change[i] / 100)
         total_value = capital + position * share_price
