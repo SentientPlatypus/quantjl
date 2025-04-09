@@ -35,6 +35,9 @@ end
 @testset "GBM Hardcoded Test" begin
     using Random, Plots
 
+
+    TICKER = "MSFT"
+
     # Ensure reproducibility
     Random.seed!(3)
 
@@ -47,9 +50,9 @@ end
     BUY_THRESHOLD = -1
 
     # Load historical data
-    percent_change = get_historical("MSFT")[LOOK_BACK_PERIOD + 1:end]
-    real_price = get_historical_raw("MSFT")[LOOK_BACK_PERIOD + 1:end]
-    gbm_scores = get_historical_vscores("MSFT", LOOK_BACK_PERIOD)
+    percent_change = get_historical(TICKER)[LOOK_BACK_PERIOD + 1:end]
+    real_price = get_historical_raw(TICKER)[LOOK_BACK_PERIOD + 1:end]
+    gbm_scores = get_historical_vscores(TICKER, LOOK_BACK_PERIOD)
 
     # Trim data to the desired length
     real_price = real_price[end - GRAPH_LENGTH:end]
@@ -100,7 +103,7 @@ end
     end
 
     # Generate plots
-    p1 = plot(portfolio_value, title="Trading with GBM vscore", xlabel="Time", ylabel="Capital")
+    p1 = plot(portfolio_value, title="Trading $TICKER with GBM vscore", xlabel="Time", ylabel="Capital")
     benchmark_capital = INITIAL_CAPITAL * cumprod(1 .+ percent_change ./ 100)
     plot!(benchmark_capital, label="Benchmark", lw=2)
 
