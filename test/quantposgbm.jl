@@ -74,7 +74,7 @@ end
         println("Episode: $i")
 
         current_capital = 1000.0
-        total_reward = 0.0
+        episode_rewards = Float64[]
         d = 0.0
         episode_length = 0
         
@@ -111,12 +111,13 @@ end
             prev_capital = current_capital
             
             # Apply market movement to existing allocation
+            current_market_allocation = target_allocation
+
             percent_change = price_data[t + 1]
             market_return = current_market_allocation * current_capital * (percent_change / 100.0)
             current_capital += market_return
             
-            # Update allocation for next step
-            current_market_allocation = target_allocation
+
             
             # Calculate reward
             raw_r = market_return - transaction_cost
@@ -130,7 +131,7 @@ end
     
             s′ = vcat(price_vscores[t - LOOK_BACK_PERIOD + 2:t + 1], [log10(current_capital)])
     
-            total_reward += raw_r 
+            push!(episode_rewards, raw_r)
         
             if current_capital < 650.0 || t == length(price_vscores) - 1
                 d = 1.0
@@ -156,10 +157,10 @@ end
 
             final_plot = plot(capital_plot, action_plot, layout=(2,1), size=(800,600))
             # Save the figure
-            Plots.savefig("plots/capital_distribution/high_frequency/episode_$(i).png")
+            Plots.savefig("plots/capital_distribution/high_freq_4-15-2025/episode_$(i).png")
         end
 
-        push!(total_rewards, total_reward)
+        push!(total_rewards, mean(episode_rewards))
     end 
     
     Plots.histogram(capitals, title="Full Capital Distribution", xlabel="Capital", ylabel="Frequency")

@@ -58,11 +58,9 @@ def infer(ticker:str, model_filename:str = "msft_keras_model.keras", future_days
     input_data = scaler.fit_transform(past_100_days)
     predictions = []
 
-    for _ in range(future_days):
-        next_day_scaled = model.predict(np.array([input_data]))
-        next_day = scaler.inverse_transform(next_day_scaled)
-        predictions.append(float(next_day[0][0]))
-        input_data = np.append(input_data, next_day_scaled, axis=0)[-100:]
+    next_day_scaled = model.predict(np.array([input_data]))
+    next_day = scaler.inverse_transform(next_day_scaled)
+    predictions.append(float(next_day[0][0]))
     return predictions, past_100_days
 
 def plot_movement(past, future, ticker):

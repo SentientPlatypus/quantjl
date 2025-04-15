@@ -36,7 +36,7 @@ end
     using Random, Plots
 
 
-    TICKER = "MSFT"
+    TICKER = "NVDA"
 
     # Ensure reproducibility
     Random.seed!(3)
@@ -46,8 +46,8 @@ end
     GRAPH_LENGTH = 200
     INITIAL_CAPITAL = 1000.0
     TRADE_COOLDOWN = 1  # Days between trades
-    SELL_THRESHOLD = 1
-    BUY_THRESHOLD = -1
+    SELL_THRESHOLD = 1.5
+    BUY_THRESHOLD = -2
 
     # Load historical data
     percent_change = get_historical(TICKER)[LOOK_BACK_PERIOD + 1:end]
@@ -94,6 +94,7 @@ end
                 position += buy_shares
                 capital -= invest_cash
                 last_trade_day = i
+                println("Capital: $capital signal at day $i: gbm_scores[$i] = $(gbm_scores[i])")
             end
         end
 
