@@ -43,63 +43,6 @@ function update_target_network!(target_net::Net, main_net::Net, τ::Float64)
     end
 end
 
-function train_exp!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
-    """Train the Quant agent using a minibatch from the replay buffer"""
-    if length(quant.replay_buffer) < batch_size 
-        return  
-    end
-
-    # Sample minibatch with priorities if available
-    if !isempty(quant.priorities)
-        probs = quant.priorities .^ 0.6  # Alpha parameter for prioritization
-        probs ./= sum(probs)
-        
-        # Sample based on priorities (requires StatsBase)
-        indices = sample(1:length(quant.replay_buffer), Weights(probs), batch_size)
-        minibatch = [quant.replay_buffer[i] for i in indices]
-    else
-        # Fall back to random sampling if priorities not initialized
-        indices = rand(1:length(quant.replay_buffer), batch_size)
-        minibatch = [quant.replay_buffer[i] for i in indices]
-    end
-
-    for (idx, (s, a, r, s′, d)) in zip(indices, minibatch)
-        # Calculate target Q-value using target networks (DDPG approach)
-        next_action = quant.π_target(s′)
-        Q_target_value = quant.Q_target(vcat(s′, next_action))
-        y = r .+ quant.γ * (1 - d) * Q_target_value
-
-        # Update critic (Q-network)
-        step!(quant.Q_, vcat(s, a), y, α, λ, 1/batch_size)
-        
-        # Calculate the action-value gradient for policy improvement
-        ∂Q∂a = step!(quant.Q_, vcat(s, quant.π_(s)), y, α, λ, 1/batch_size, false)
-
-        # Handle invalid gradients more gracefully
-        if any(isnan, ∂Q∂a) || any(isinf, ∂Q∂a)
-            println("Warning: Invalid gradient detected for sample $idx, skipping update")
-            continue
-        end
-
-        # Extract the gradient with respect to the action
-        action_grad = ∂Q∂a[end - quant.π_.output.out_features + 1:end]
-        
-        # Update actor (policy network) using the action-value gradient
-        quant.π_.L′ = (ŷ, y) -> -action_grad  # DDPG uses gradient ascent on policy
-        back_custom!(quant.π_, s, -action_grad, α, λ, 1/batch_size)
-        
-        # Update priorities based on TD error
-        if !isempty(quant.priorities)
-            Q_pred = quant.Q_(vcat(s, a))
-            td_error = abs(y[1] - Q_pred[1])
-            quant.priorities[idx] = td_error + 0.01  # Small constant to avoid zero priority
-        end
-    end
-
-    # Update target networks: θ_target ← τ * θ + (1 - τ) θ_target
-    update_target_network!(quant.π_target, quant.π_, quant.τ)
-    update_target_network!(quant.Q_target, quant.Q_, quant.τ)
-end
 
 function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
     """Train the Quant agent using a minibatch from the replay buffer"""

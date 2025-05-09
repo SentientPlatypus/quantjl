@@ -25,6 +25,17 @@ function get_historical_vscores(ticker::String, OBS::Int=100, EPOCH::Int=1000, E
     return vscore(raw, OBS, EPOCH, EXT)
 end
 
+
+function stack_data(tickers::Vector{String}, OBS::Int=100, EPOCH::Int=1000, EXT::Int=20, seed::Int=3)
+    data = Dict{String, Vector{Float64}}()
+    for ticker in tickers
+        data[ticker] = get_historical_vscores(ticker, OBS, EPOCH, EXT, seed)
+    end
+    return data
+end
+
+
+
 mutable struct OUNoise
     θ::Float64
     μ::Float64

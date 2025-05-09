@@ -35,37 +35,37 @@ end
 
     Random.seed!(3)
 
-    # π_ = Net([Layer(201, 175, relu, relu′),
-    #           Layer(175, 150, relu, relu′),
-    #           Layer(150, 125, relu, relu′),
-    #           Layer(125, 100, relu, relu′),
-    #           Layer(100, 80, relu, relu′),
-    #           Layer(80, 64, relu, relu′),
-    #           Layer(64, 32, relu, relu′),
-    #           Layer(32, 16, relu, relu′),
-    #           Layer(16, 1, idty, idty′)], mse_loss, mse_loss′)
-
-    # Q̂ = Net([ Layer(202, 175, relu, relu′),  # State + Action as input
-    #           Layer(175, 150, relu, relu′),
-    #           Layer(150, 125, relu, relu′),
-    #           Layer(125, 100, relu, relu′),
-    #           Layer(100, 80, relu, relu′),
-    #           Layer(80, 64, relu, relu′),
-    #           Layer(64, 32, relu, relu′),
-    #           Layer(32, 16, relu, relu′),
-    #           Layer(16, 1, idty, idty′)], mse_loss, mse_loss′)
-
-    π_ = Net([Layer(101, 80, relu, relu′),
-            Layer(80, 64, relu, relu′),
-            Layer(64, 32, relu, relu′),
-            Layer(32, 16, relu, relu′),
-            Layer(16, 1, idty, idty′)], mse_loss, mse_loss′)
-
-    Q̂ = Net([ Layer(102, 80, relu, relu′),  # State + Action as input
+    π_ = Net([Layer(201, 175, relu, relu′),
+              Layer(175, 150, relu, relu′),
+              Layer(150, 125, relu, relu′),
+              Layer(125, 100, relu, relu′),
+              Layer(100, 80, relu, relu′),
               Layer(80, 64, relu, relu′),
               Layer(64, 32, relu, relu′),
               Layer(32, 16, relu, relu′),
               Layer(16, 1, idty, idty′)], mse_loss, mse_loss′)
+
+    Q̂ = Net([ Layer(202, 175, relu, relu′),  # State + Action as input
+              Layer(175, 150, relu, relu′),
+              Layer(150, 125, relu, relu′),
+              Layer(125, 100, relu, relu′),
+              Layer(100, 80, relu, relu′),
+              Layer(80, 64, relu, relu′),
+              Layer(64, 32, relu, relu′),
+              Layer(32, 16, relu, relu′),
+              Layer(16, 1, idty, idty′)], mse_loss, mse_loss′)
+
+    # π_ = Net([Layer(101, 80, relu, relu′),
+    #         Layer(80, 64, relu, relu′),
+    #         Layer(64, 32, relu, relu′),
+    #         Layer(32, 16, relu, relu′),
+    #         Layer(16, 1, idty, idty′)], mse_loss, mse_loss′)
+
+    # Q̂ = Net([ Layer(102, 80, relu, relu′),  # State + Action as input
+    #           Layer(80, 64, relu, relu′),
+    #           Layer(64, 32, relu, relu′),
+    #           Layer(32, 16, relu, relu′),
+    #           Layer(16, 1, idty, idty′)], mse_loss, mse_loss′)
 
     γ = 0.95
     τ = 0.009
@@ -89,6 +89,7 @@ end
     ou_noise = OUNoise(θ=0.15, μ=0.0, σ=0.2, dt=1.0) # Initialize OU noise
 
     
+
     
     for i in 1:NUM_EPISODES
 
@@ -113,7 +114,7 @@ end
             episode_length += 1
     
             # Normalize state
-            s = vcat(price_vscores[t - LOOK_BACK_PERIOD + 1:t], [log10(current_capital)])
+            s = vcat(price_vscores[t - LOOK_BACK_PERIOD + 1:t], spy_vscores[t - LOOK_BACK_PERIOD + 1 : t], [log10(current_capital)])
         
             # Generate action (target allocation)
             ε = sample!(ou_noise)
@@ -150,7 +151,7 @@ end
     
             push!(capitals, current_capital)
     
-            s′ = vcat(price_vscores[t - LOOK_BACK_PERIOD + 2:t + 1], [log10(current_capital)])
+            s′ = vcat(price_vscores[t - LOOK_BACK_PERIOD + 2:t + 1], spy_vscores[t - LOOK_BACK_PERIOD + 2 : t + 1], [log10(current_capital)])
     
             push!(episode_rewards, raw_r)
         
@@ -178,7 +179,7 @@ end
 
             final_plot = plot(capital_plot, action_plot, layout=(2,1), size=(800,600))
             # Save the figure
-            Plots.savefig("plots/capital_distribution/high_freq_5-3-2025/episode_$(i).png")
+            Plots.savefig("plots/capital_distribution/high_freq_5-8-2025/episode_$(i).png")
         end
 
         push!(total_rewards, mean(episode_rewards))
