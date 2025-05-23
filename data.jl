@@ -1,5 +1,7 @@
 using CSV
 using DataFrames
+using Statistics
+using Dates
 include("gbm.jl")
 
 
@@ -12,7 +14,7 @@ function get_historical(ticker::String)
 end
 
 
-function get_historical_raw(ticker::String)
+function get_historical_raw_list(ticker::String)
     #run(`python download.py $ticker`)
     
     df = CSV.read("data/$ticker.csv", DataFrame)
@@ -20,22 +22,123 @@ function get_historical_raw(ticker::String)
     return reverse(raw)
 end
 
+function get_historical_raw(ticker::String)
+    df = CSV.read("$(ticker).csv", DataFrame)
+    df.date = DateTime.(df.date)
+    sort!(df, :date)
+    return df
+end
+
+
+# 0. VSCORES.
 function get_historical_vscores(ticker::String, OBS::Int=100, EPOCH::Int=1000, EXT::Int=20, seed::Int=3)
-    raw = get_historical_raw(ticker)
+    raw = get_historical_raw_list(ticker)
     return vscore(raw, OBS, EPOCH, EXT)
 end
 
 
-function stack_data(tickers::Vector{String}, OBS::Int=100, EPOCH::Int=1000, EXT::Int=20, seed::Int=3)
-    data = Dict{String, Vector{Float64}}()
-    for ticker in tickers
-        data[ticker] = get_historical_vscores(ticker, OBS, EPOCH, EXT, seed)
+# 1. Simple Moving Average (SMA)
+function sma_series(ticker::String, window::Int=14)
+    df = get_historical_raw(ticker)
+    sma = [i < window ? NaN : mean(df.close[i-window+1:i]) for i in 1:nrow(df)]
+    return sma
+end
+
+# 2. Exponential Moving Average (EMA)
+function ema_series(ticker::String, window::Int=14)
+    df = get_historical_raw(ticker)
+    ema = ema(df.close, window)
+    return ema
+end
+
+# 3. RSI
+function rsi_series(ticker::String, window::Int=14)
+    df = get_historical_raw(ticker)
+    rsi = rsi(df.close, window)
+    return rsi
+end
+
+# 4. MACD
+function macd_series(ticker::String)
+    df = get_historical_raw(ticker)
+    macd_line, signal_line = macd(df.close)
+    return macd_line
+end
+
+# 5. Bollinger Band %B
+function bb_percentb_series(ticker::String, window::Int=20)
+    df = get_historical_raw(ticker)
+    ma = [i < window ? NaN : mean(df.close[i-window+1:i]) for i in 1:nrow(df)]
+    stddev = [i < window ? NaN : std(df.close[i-window+1:i]) for i in 1:nrow(df)]
+    upper = ma .+ 2 .* stddev
+    lower = ma .- 2 .* stddev
+    percentb = (df.close .- lower) ./ (upper .- lower)
+    return percentb
+end
+
+# 6. ATR
+function atr_series(ticker::String, window::Int=14)
+    df = get_historical_raw(ticker)
+    tr = [maximum([df.high[i]-df.low[i], abs(df.high[i]-df.close[i-1]), abs(df.low[i]-df.close[i-1])]) for i in 2:nrow(df)]
+    atr = [NaN; movmean(tr, window)]
+    return atr
+end
+
+# 7. VWAP
+function vwap_series(ticker::String)
+    df = get_historical_raw(ticker)
+    typical_price = (df.high .+ df.low .+ df.close) ./ 3
+    cum_vp = cumsum(typical_price .* df.volume)
+    cum_vol = cumsum(df.volume)
+    return cum_vp ./ cum_vol
+end
+
+# 8. OBV
+function obv_series(ticker::String)
+    df = get_historical_raw(ticker)
+    obv = zeros(Float64, nrow(df))
+    for i in 2:nrow(df)
+        if df.close[i] > df.close[i-1]
+            obv[i] = obv[i-1] + df.volume[i]
+        elseif df.close[i] < df.close[i-1]
+            obv[i] = obv[i-1] - df.volume[i]
+        else
+            obv[i] = obv[i-1]
+        end
     end
-    return data
+    return obv
+end
+
+# 9. Time-of-Day Feature (sin/cos of minutes since open)
+function time_of_day_features(ticker::String)
+    df = get_historical_raw(ticker)
+    time = Time.(DateTime.(df.date))
+    minutes = [Dates.hour(t)*60 + Dates.minute(t) for t in time]
+    max_minute = maximum(minutes)
+    sin_feat = sin.(2π .* minutes ./ max_minute)
+    cos_feat = cos.(2π .* minutes ./ max_minute)
+    return sin_feat, cos_feat
+end
+
+# Combine all features
+function get_all_features(ticker::String, LOOK_BACK_PERIOD::Int=100)
+    df = DataFrame()
+
+    df.vscores = get_historical_vscores(ticker, LOOK_BACK_PERIOD)
+    # df.sma = sma_series(ticker)
+    # df.ema = ema_series(ticker)
+    # df.rsi = rsi_series(ticker)
+    # df.macd = macd_series(ticker)
+    # df.bb_percentb = bb_percentb_series(ticker)
+    # df.atr = atr_series(ticker)
+    # df.vwap = vwap_series(ticker)
+    # df.obv = obv_series(ticker)
+    # df.sin_tod, df.cos_tod = time_of_day_features(ticker)
+    return df
 end
 
 
-
+##NOISE_------------------------------------------
 mutable struct OUNoise
     θ::Float64
     μ::Float64

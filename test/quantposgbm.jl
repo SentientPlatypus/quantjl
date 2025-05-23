@@ -35,37 +35,35 @@ end
 
     Random.seed!(3)
 
-    π_ = Net([Layer(201, 175, relu, relu′),
-              Layer(175, 150, relu, relu′),
-              Layer(150, 125, relu, relu′),
-              Layer(125, 100, relu, relu′),
-              Layer(100, 80, relu, relu′),
-              Layer(80, 64, relu, relu′),
-              Layer(64, 32, relu, relu′),
-              Layer(32, 16, relu, relu′),
-              Layer(16, 1, idty, idty′)], mse_loss, mse_loss′)
+    ticker = "MSFT"
+    LOOK_BACK_PERIOD = 100
+    NUM_EPISODES = 1000
 
-    Q̂ = Net([ Layer(202, 175, relu, relu′),  # State + Action as input
-              Layer(175, 150, relu, relu′),
-              Layer(150, 125, relu, relu′),
-              Layer(125, 100, relu, relu′),
-              Layer(100, 80, relu, relu′),
-              Layer(80, 64, relu, relu′),
-              Layer(64, 32, relu, relu′),
-              Layer(32, 16, relu, relu′),
-              Layer(16, 1, idty, idty′)], mse_loss, mse_loss′)
+    price_data = get_historical(ticker)[LOOK_BACK_PERIOD + 1:end] #price percent changes
+    features = get_all_features(ticker, LOOK_BACK_PERIOD) #features SEE data.jl for specifics.
+    
+    println(features)
+    println(nrow(features))
 
-    # π_ = Net([Layer(101, 80, relu, relu′),
-    #         Layer(80, 64, relu, relu′),
-    #         Layer(64, 32, relu, relu′),
-    #         Layer(32, 16, relu, relu′),
-    #         Layer(16, 1, idty, idty′)], mse_loss, mse_loss′)
 
-    # Q̂ = Net([ Layer(102, 80, relu, relu′),  # State + Action as input
-    #           Layer(80, 64, relu, relu′),
-    #           Layer(64, 32, relu, relu′),
-    #           Layer(32, 16, relu, relu′),
-    #           Layer(16, 1, idty, idty′)], mse_loss, mse_loss′)
+    π_ = Net([
+        Layer(ncol(features) * LOOK_BACK_PERIOD + 1, 80, relu, relu′),
+        Layer(80, 50, relu, relu′),
+        Layer(50, 30, relu, relu′),
+        Layer(30, 10, relu, relu′),
+        Layer(10, 1, my_tanh, my_tanh′)
+    ], mse_loss, mse_loss′)
+
+    Q̂ = Net([
+        Layer(ncol(features) * LOOK_BACK_PERIOD  + 2, 80, relu, relu′),
+        Layer(80, 50, relu, relu′),
+        Layer(50, 30, relu, relu′),
+        Layer(30, 10, relu, relu′),
+        Layer(10, 1, my_tanh, my_tanh′)
+    ], mse_loss, mse_loss′)
+
+
+    println("STARTING TRAINING FOR $(ticker). Using features: $(names(features))")
 
     γ = 0.95
     τ = 0.009
@@ -75,21 +73,10 @@ end
 
 
     capitals = 1000 .+ 200 .* randn(100)
-
-
     rewards = randn(100) 
-
-
-    LOOK_BACK_PERIOD = 100
-    NUM_EPISODES = 200
-    
-    price_data = get_historical("MSFT")[LOOK_BACK_PERIOD + 1:end] #price percent changes
-    price_vscores = get_historical_vscores("MSFT", LOOK_BACK_PERIOD) #price vscores
-    spy_vscores = get_historical_vscores("SPY", LOOK_BACK_PERIOD) #SPY vscores for benchmark
     ou_noise = OUNoise(θ=0.15, μ=0.0, σ=0.2, dt=1.0) # Initialize OU noise
 
     
-
     
     for i in 1:NUM_EPISODES
 
@@ -104,9 +91,9 @@ end
         current_market_allocation = 0.0  # Start with 0% allocated (all cash)
         actions = []
         recent_returns = Float64[]
-        start_t = rand(LOOK_BACK_PERIOD:length(price_vscores) - 100)
+        start_t = rand(LOOK_BACK_PERIOD:nrow(features) - 100)
         
-        for t in start_t:length(price_vscores) - 1
+        for t in start_t:nrow(features) - 1
             if d == 1.0
                 break
             end
@@ -114,7 +101,7 @@ end
             episode_length += 1
     
             # Normalize state
-            s = vcat(price_vscores[t - LOOK_BACK_PERIOD + 1:t], spy_vscores[t - LOOK_BACK_PERIOD + 1 : t], [log10(current_capital)])
+            s = vcat([features[!, col][t - LOOK_BACK_PERIOD + 1:t] for col in names(features)]..., [log10(current_capital)])
         
             # Generate action (target allocation)
             ε = sample!(ou_noise)
@@ -151,11 +138,11 @@ end
     
             push!(capitals, current_capital)
     
-            s′ = vcat(price_vscores[t - LOOK_BACK_PERIOD + 2:t + 1], spy_vscores[t - LOOK_BACK_PERIOD + 2 : t + 1], [log10(current_capital)])
+            s′ = vcat([features[!, col][t - LOOK_BACK_PERIOD + 2:t+1] for col in names(features)]..., [log10(current_capital)])
     
             push!(episode_rewards, raw_r)
         
-            if current_capital < 650.0 || t == length(price_vscores) - 1
+            if current_capital < 650.0 || t == nrow(features) - 1
                 d = 1.0
             end
     
@@ -164,7 +151,7 @@ end
             train!(quant, 0.0001, 0.0001, 64)
         end
         
-        if i % 20 == 0 || i == 1
+        if i % 100 == 0 || i == 1
             # Compute benchmark capital over the same episode length
             benchmark_capital_traj = 1000 * cumprod(1 .+ price_data[start_t:start_t+episode_length-1] ./ 100)
 
@@ -179,7 +166,7 @@ end
 
             final_plot = plot(capital_plot, action_plot, layout=(2,1), size=(800,600))
             # Save the figure
-            Plots.savefig("plots/capital_distribution/high_freq_5-8-2025/episode_$(i).png")
+            Plots.savefig("plots/capital_distribution/new_dataform_5-22-2025/episode_$(i).png")
         end
 
         push!(total_rewards, mean(episode_rewards))
