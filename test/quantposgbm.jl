@@ -37,7 +37,7 @@ end
 
     ticker = "MSFT"
     LOOK_BACK_PERIOD = 100
-    NUM_EPISODES = 1000
+    NUM_EPISODES = 3000
 
     price_data = get_historical(ticker)[LOOK_BACK_PERIOD + 1:end] #price percent changes
     features = get_all_features(ticker, LOOK_BACK_PERIOD) #features SEE data.jl for specifics.
@@ -151,7 +151,7 @@ end
             train!(quant, 0.0001, 0.0001, 64)
         end
         
-        if i % 100 == 0 || i == 1
+        if i % 500 == 0 || i == 1
             # Compute benchmark capital over the same episode length
             benchmark_capital_traj = 1000 * cumprod(1 .+ price_data[start_t:start_t+episode_length-1] ./ 100)
 
