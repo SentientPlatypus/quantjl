@@ -162,6 +162,31 @@ function time_of_day_features(ticker::String)
     return sin_feat, cos_feat
 end
 
+function macd_series(ticker::String; short_period::Int = 12, long_period::Int = 26, signal_period::Int = 9)
+    df = get_historical_raw(ticker)
+    close = df.close
+
+    # EMA helper function
+    function ema(series::Vector{Float64}, period::Int)
+        alpha = 2.0 / (period + 1)
+        ema_series = similar(series)
+        ema_series[1] = series[1]  # Initialize with first value
+        for i in 2:length(series)
+            ema_series[i] = alpha * series[i] + (1 - alpha) * ema_series[i-1]
+        end
+        return ema_series
+    end
+
+    short_ema = ema(close, short_period)
+    long_ema = ema(close, long_period)
+    macd_line = short_ema .- long_ema
+    signal_line = ema(macd_line, signal_period)
+    histogram = macd_line .- signal_line
+
+    return histogram
+end
+
+
 # Combine all features
 function get_all_features(ticker::String, LOOK_BACK_PERIOD::Int=100)
     df = DataFrame()
@@ -169,11 +194,11 @@ function get_all_features(ticker::String, LOOK_BACK_PERIOD::Int=100)
     df.vscores = get_historical_vscores(ticker, LOOK_BACK_PERIOD)
     # df.sma = sma_series(ticker)
     # df.ema = ema_series(ticker)
-    # df.rsi = rsi_series(ticker)
-    # df.macd = macd_series(ticker)
+    df.rsi = rsi_series(ticker)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
+    df.macd = macd_series(ticker)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
     # df.bb_percentb = bb_percentb_series(ticker)
     # df.atr = atr_series(ticker)
-    # df.vwap = vwap_series(ticker)
+    df.vwap = vwap_series(ticker)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
     # df.obv = obv_series(ticker)
     # df.sin_tod, df.cos_tod = time_of_day_features(ticker)
     return df

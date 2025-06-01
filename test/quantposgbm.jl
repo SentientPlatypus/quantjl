@@ -47,7 +47,11 @@ end
 
 
     π_ = Net([
-        Layer(ncol(features) * LOOK_BACK_PERIOD + 1, 80, relu, relu′),
+        Layer(ncol(features) * LOOK_BACK_PERIOD + 1, 700, relu, relu′),
+        Layer(700, 500, relu, relu′),
+        Layer(500, 300, relu, relu′),
+        Layer(300, 200, relu, relu′),
+        Layer(200, 100, relu, relu′),
         Layer(80, 50, relu, relu′),
         Layer(50, 30, relu, relu′),
         Layer(30, 10, relu, relu′),
@@ -55,7 +59,11 @@ end
     ], mse_loss, mse_loss′)
 
     Q̂ = Net([
-        Layer(ncol(features) * LOOK_BACK_PERIOD  + 2, 80, relu, relu′),
+        Layer(ncol(features) * LOOK_BACK_PERIOD  + 2, 880, relu, relu′),
+        Layer(800, 500, relu, relu′),
+        Layer(500, 300, relu, relu′),
+        Layer(300, 200, relu, relu′),
+        Layer(200, 100, relu, relu′),
         Layer(80, 50, relu, relu′),
         Layer(50, 30, relu, relu′),
         Layer(30, 10, relu, relu′),
