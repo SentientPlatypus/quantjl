@@ -37,7 +37,7 @@ end
 
     ticker = "MSFT"
     LOOK_BACK_PERIOD = 100
-    NUM_EPISODES = 3000
+    NUM_EPISODES = 200
 
     price_data = get_historical(ticker)[LOOK_BACK_PERIOD + 1:end] #price percent changes
     features = get_all_features(ticker, LOOK_BACK_PERIOD) #features SEE data.jl for specifics.
@@ -47,24 +47,18 @@ end
 
 
     π_ = Net([
-        Layer(ncol(features) * LOOK_BACK_PERIOD + 1, 700, relu, relu′),
-        Layer(700, 500, relu, relu′),
-        Layer(500, 300, relu, relu′),
-        Layer(300, 200, relu, relu′),
+        Layer(ncol(features) * LOOK_BACK_PERIOD + 1, 200, relu, relu′),
         Layer(200, 100, relu, relu′),
-        Layer(80, 50, relu, relu′),
+        Layer(100, 50, relu, relu′),
         Layer(50, 30, relu, relu′),
         Layer(30, 10, relu, relu′),
         Layer(10, 1, my_tanh, my_tanh′)
     ], mse_loss, mse_loss′)
 
     Q̂ = Net([
-        Layer(ncol(features) * LOOK_BACK_PERIOD  + 2, 880, relu, relu′),
-        Layer(800, 500, relu, relu′),
-        Layer(500, 300, relu, relu′),
-        Layer(300, 200, relu, relu′),
+        Layer(ncol(features) * LOOK_BACK_PERIOD  + 2, 200, relu, relu′),
         Layer(200, 100, relu, relu′),
-        Layer(80, 50, relu, relu′),
+        Layer(100, 50, relu, relu′),
         Layer(50, 30, relu, relu′),
         Layer(30, 10, relu, relu′),
         Layer(10, 1, my_tanh, my_tanh′)
@@ -159,7 +153,7 @@ end
             train!(quant, 0.0001, 0.0001, 64)
         end
         
-        if i % 500 == 0 || i == 1
+        if i % 5 == 0 || i == 1
             # Compute benchmark capital over the same episode length
             benchmark_capital_traj = 1000 * cumprod(1 .+ price_data[start_t:start_t+episode_length-1] ./ 100)
 
@@ -174,7 +168,7 @@ end
 
             final_plot = plot(capital_plot, action_plot, layout=(2,1), size=(800,600))
             # Save the figure
-            Plots.savefig("plots/capital_distribution/new_dataform_5-22-2025/episode_$(i).png")
+            Plots.savefig("plots/capital_distribution/new_indicators_6-1-2025/episode_$(i).png")
         end
 
         push!(total_rewards, mean(episode_rewards))

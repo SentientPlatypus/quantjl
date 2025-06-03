@@ -198,10 +198,19 @@ function get_all_features(ticker::String, LOOK_BACK_PERIOD::Int=100)
     df.macd = macd_series(ticker)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
     # df.bb_percentb = bb_percentb_series(ticker)
     # df.atr = atr_series(ticker)
-    df.vwap = vwap_series(ticker)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
+    #df.vwap = vwap_series(ticker)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
     # df.obv = obv_series(ticker)
     # df.sin_tod, df.cos_tod = time_of_day_features(ticker)
-    return df
+    
+    df_standardized = deepcopy(df)
+    cols_to_standardize = [:rsi]
+    for col in cols_to_standardize
+        μ = mean(df[!, col])
+        σ = std(df[!, col])
+        df_standardized[!, col] = (df[!, col] .- μ) ./ σ
+    end
+
+    return df_standardized
 end
 
 
