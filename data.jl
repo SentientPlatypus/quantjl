@@ -23,7 +23,7 @@ function get_historical_raw_list(ticker::String)
 end
 
 function get_historical_raw(ticker::String)
-    df = CSV.read("$(ticker).csv", DataFrame)
+    df = CSV.read("data/$(ticker).csv", DataFrame)
     sort!(df, :date)
     return df
 end
@@ -188,29 +188,48 @@ end
 
 
 # Combine all features
-function get_all_features(ticker::String, LOOK_BACK_PERIOD::Int=100)
+function get_all_features(ticker::String, day::Int, LOOK_BACK_PERIOD::Int=100)
     df = DataFrame()
 
-    df.vscores = get_historical_vscores(ticker, LOOK_BACK_PERIOD)
-    # df.sma = sma_series(ticker)
-    # df.ema = ema_series(ticker)
-    df.rsi = rsi_series(ticker)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
-    df.macd = macd_series(ticker)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
-    # df.bb_percentb = bb_percentb_series(ticker)
-    # df.atr = atr_series(ticker)
-    #df.vwap = vwap_series(ticker)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
-    # df.obv = obv_series(ticker)
-    # df.sin_tod, df.cos_tod = time_of_day_features(ticker)
+    current_date_str = Dates.format(Dates.today(), "yyyy-mm-dd")
+
+    filepath_name = "$(current_date_str)/$(ticker)_day$(day)"
+
+    df.vscores = get_historical_vscores(filepath_name, LOOK_BACK_PERIOD)
+    # df.sma = sma_series(filepath_name)
+
+
+    df.ema = ema_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
+    df.rsi = rsi_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
+    df.macd = macd_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
+    # df.bb_percentb = bb_percentb_series(filepath_name)
+    # df.atr = atr_series(filepath_name)
+    #df.vwap = vwap_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
+    # df.obv = obv_series(filepath_name)
+    # df.sin_tod, df.cos_tod = time_of_day_features(filepath_name)
     
     df_standardized = deepcopy(df)
-    cols_to_standardize = [:rsi]
+    cols_to_standardize = [:rsi, :ema]
     for col in cols_to_standardize
         μ = mean(df[!, col])
         σ = std(df[!, col])
         df_standardized[!, col] = (df[!, col] .- μ) ./ σ
     end
 
-    return df_standardized
+    day_price = get_historical_raw(filepath_name).changeClosePercent[LOOK_BACK_PERIOD+1 : end]
+    return df_standardized, day_price
+end
+
+function get_month_features(ticker::String, days::Int=30, LOOK_BACK_PERIOD=100)
+    dataframes = []
+    prices = []
+
+    for day in 1:days
+        df, day_price = get_all_features(ticker, day, LOOK_BACK_PERIOD)
+        push!(prices, day_price)
+        push!(dataframes, df)
+    end
+    return dataframes, prices
 end
 
 

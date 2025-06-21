@@ -8,7 +8,7 @@ using Plots
 
 @testset "GBM NEW" begin
     Random.seed!(3)
-    percent_change = get_historical_raw("AAPL")
+    percent_change = get_historical_raw_list("AAPL")
     gbm_path2 = vscore(percent_change)
     plot(gbm_path2[end - 360:end], title="GBM Path", xlabel="Time", ylabel="Value")
     savefig("plots/gbm_path2.png")
@@ -18,7 +18,7 @@ end
 
 @testset "PATH 1000" begin
     Random.seed!(3)
-    raw = get_historical_raw("AAPL")
+    raw = get_historical_raw_list("AAPL")
     plot(raw, title="AAPL_RAW", xlabel="Time", ylabel="Value")
     savefig("plots/appl_1000_raw.png")
 end
@@ -36,7 +36,7 @@ end
     using Random, Plots
 
 
-    TICKER = "NVDA"
+    TICKER = "2025-06-14/MSFT_day30"
 
     # Ensure reproducibility
     Random.seed!(3)
@@ -51,7 +51,7 @@ end
 
     # Load historical data
     percent_change = get_historical(TICKER)[LOOK_BACK_PERIOD + 1:end]
-    real_price = get_historical_raw(TICKER)[LOOK_BACK_PERIOD + 1:end]
+    real_price = get_historical_raw_list(TICKER)[LOOK_BACK_PERIOD + 1:end]
     gbm_scores = get_historical_vscores(TICKER, LOOK_BACK_PERIOD)
 
     # Trim data to the desired length
