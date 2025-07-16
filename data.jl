@@ -202,7 +202,7 @@ function get_all_features(ticker::String, day::Int, LOOK_BACK_PERIOD::Int=100)
     df.ema = ema_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
     df.rsi = rsi_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
     df.macd = macd_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
-    # df.bb_percentb = bb_percentb_series(filepath_name)
+    df.bb_percentb = bb_percentb_series(filepath_name)[LOOK_BACK_PERIOD+1:end]
     # df.atr = atr_series(filepath_name)
     #df.vwap = vwap_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
     # df.obv = obv_series(filepath_name)
@@ -225,9 +225,16 @@ function get_month_features(ticker::String, days::Int=30, LOOK_BACK_PERIOD=100)
     prices = []
 
     for day in 1:days
-        df, day_price = get_all_features(ticker, day, LOOK_BACK_PERIOD)
-        push!(prices, day_price)
-        push!(dataframes, df)
+
+        try
+            df, day_price = get_all_features(ticker, day, LOOK_BACK_PERIOD)
+
+            push!(prices, day_price)
+            push!(dataframes, df)
+        catch e
+            @warn "Failed to get features for day $day: $(e)"
+            continue
+        end
     end
     return dataframes, prices
 end

@@ -19,6 +19,7 @@ function calculate_better_reward(raw_return, capital, prev_capital, risk_window=
         risk_penalty = risk_aversion * std(recent_returns)
     end
     
+
     # Capital protection component - penalize being below initial capital
     capital_penalty = 0.0
     if capital < 1000.0
@@ -35,7 +36,7 @@ end
 
     Random.seed!(3)
 
-    ticker = "MSFT"
+    ticker = "AAPL"
     LOOK_BACK_PERIOD = 100
     NUM_EPISODES = 100
 
@@ -43,7 +44,8 @@ end
     nIndicators = ncol(month_features[1])
     
     π_ = Net([
-        Layer(nIndicators * LOOK_BACK_PERIOD + 1, 300, relu, relu′),
+        Layer(nIndicators * LOOK_BACK_PERIOD + 1, 400, relu, relu′),
+        Layer(400, 300, relu, relu′),
         Layer(300, 200, relu, relu′),
         Layer(200, 100, relu, relu′),
         Layer(100, 50, relu, relu′),
@@ -53,13 +55,14 @@ end
     ], mse_loss, mse_loss′)
 
     Q̂ = Net([
-        Layer(nIndicators * LOOK_BACK_PERIOD  + 2, 300, relu, relu′),
+        Layer(nIndicators * LOOK_BACK_PERIOD  + 2, 400, relu, relu′),
+        Layer(400, 300, relu, relu′),
         Layer(300, 200, relu, relu′),
         Layer(200, 100, relu, relu′),
         Layer(100, 50, relu, relu′),
         Layer(50, 30, relu, relu′),
         Layer(30, 10, relu, relu′),
-        Layer(10, 1, my_tanh, my_tanh′)
+        Layer(10, 1, idty, idty′)
     ], mse_loss, mse_loss′)
 
 
@@ -93,7 +96,7 @@ end
         recent_returns = Float64[]
         
 
-        day = rand(1:length(month_features))
+        day = rand(1:2)
 
         day_features = month_features[day]
         day_prices = month_prices[day]
@@ -119,7 +122,7 @@ end
             allocation_change = target_allocation - current_market_allocation
             
             # Apply market impact/transaction costs (optional)
-            transaction_cost = 0.001 * abs(allocation_change) * current_capital
+            transaction_cost = 0.025 * abs(allocation_change) * current_capital
             current_capital -= transaction_cost
             
             # Record capital before market moves
@@ -159,11 +162,11 @@ end
         
         if i % 5 == 0 || i == 1
             # Compute benchmark capital over the same episode length
-            benchmark_capital_traj = 1000 * cumprod(1 .+ day_prices[1:episode_length-1] ./ 100)
+            benchmark_capital_traj = 1000 * cumprod(1 .+ day_prices[1:episode_length-LOOK_BACK_PERIOD] ./ 100)
 
             # Plot agent's capital trajectory
             capital_plot = plot(capitals[end - episode_length + 1:end], title="Episode $i Capital over time", 
-                    xlabel="Time", ylabel="Capital", label="Agent", lw=1)
+                xlabel="Time", ylabel="Capital", label="Agent", lw=1)
 
             # Overlay benchmark trajectory (Buy & Hold)
             plot!(capital_plot, benchmark_capital_traj, label="Benchmark (Buy & Hold)", linestyle=:dash, color=:red, lw=1)

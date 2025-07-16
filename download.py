@@ -61,45 +61,6 @@ def read_historical(tickers:list, apikey):
     df.to_csv(f".{dsp}data{dsp}merge.csv", index=False)
 
 
-# def read_high_frequency(tickers:list, apikey):
-#     "EXAMPLE LINK: https://financialmodelingprep.com/api/v3/historical-chart/1min/MSFT?from=2023-08-10&to=2023-09-10&apikey=LQ4Ifyu8MVzmtmXbL5e6pKte89lZhXcT"
-
-#     df = pd.DataFrame()
-#     for ticker in tickers:
-#         # Build the URL for downloading high-frequency data
-#         url = "https://financialmodelingprep.com/api/v3/historical-chart/1min"
-#         if ticker.endswith("=X"):
-#             url += "/{}?apikey={}".format("USD" + ticker[:-2], apikey)
-#         else:
-#             url += "/{}?apikey={}".format(ticker, apikey)
-
-#         print("URL: ", url)
-        
-#         json_data = get_jsonparsed_data(url)
-        
-#         # Convert the "historical" data into a DataFrame
-#         hist_df = pd.DataFrame(json_data)
-        
-#         hist_df = hist_df[::-1]
-#         hist_df["changeClosePercent"] = hist_df["close"].pct_change() * 100
-#         hist_df = hist_df[::-1]
-        
-#         # Write the modified DataFrame to CSV.
-#         hist_df.to_csv(f".{dsp}data{dsp}{ticker}.csv", index=False)
-        
-#         # Merge historical data of all tickers into one CSV file (using adjClose)
-#         hist = hist_df[["date", "close"]].copy()
-#         hist = hist.rename(columns={"close": ticker})
-#         if df.empty:
-#             df = hist
-#         else:
-#             df = df.merge(hist, on="date")
-        
-#     df = df.drop(columns=["date"])
-#     df.to_csv(f".{dsp}data{dsp}merge.csv", index=False)
-
-
-
 
 
 def read_high_frequency(tickers: list, apikey: str, start_date: str, day_index: int = 1):
@@ -123,6 +84,7 @@ def read_high_frequency(tickers: list, apikey: str, start_date: str, day_index: 
     
     df = pd.DataFrame()
     for ticker in tickers:
+
         url = "https://financialmodelingprep.com/api/v3/historical-chart/1min"
         if ticker.endswith("=X"):
             url += f"/USD{ticker[:-2]}?from={start_date}&to={end_date}&apikey={apikey}"
@@ -133,6 +95,10 @@ def read_high_frequency(tickers: list, apikey: str, start_date: str, day_index: 
         json_data = get_jsonparsed_data(url)
         
         hist_df = pd.DataFrame(json_data)[::-1]
+
+        if hist_df.empty:
+            print(f"No data found for {ticker} on {start_date}. Skipping.")
+            continue
         hist_df["changeClosePercent"] = hist_df["close"].pct_change().fillna(0) * 100
         hist_df = hist_df[::-1]
         
@@ -143,6 +109,9 @@ def read_high_frequency(tickers: list, apikey: str, start_date: str, day_index: 
         hist = hist_df[["date", "close"]].rename(columns={"close": ticker})
         df = hist if df.empty else df.merge(hist, on="date")
 
+    if df.empty:
+        print(f"No data found for any ticker on {start_date}.")
+        return pd.DataFrame()
     df.iloc[-1, -1] = 0.0
     return df
 
