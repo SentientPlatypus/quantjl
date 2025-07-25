@@ -36,17 +36,15 @@ end
 
     Random.seed!(3)
 
-    ticker = "AAPL"
-    LOOK_BACK_PERIOD = 100
-    NUM_EPISODES = 100
+    ticker = "MSFT"
+    LOOK_BACK_PERIOD = 30
+    NUM_EPISODES = 500
 
     month_features, month_prices = get_month_features(ticker, 30,LOOK_BACK_PERIOD)
     nIndicators = ncol(month_features[1])
     
     π_ = Net([
-        Layer(nIndicators * LOOK_BACK_PERIOD + 1, 400, relu, relu′),
-        Layer(400, 300, relu, relu′),
-        Layer(300, 200, relu, relu′),
+        Layer(nIndicators * LOOK_BACK_PERIOD + 1, 200, relu, relu′),
         Layer(200, 100, relu, relu′),
         Layer(100, 50, relu, relu′),
         Layer(50, 30, relu, relu′),
@@ -55,9 +53,7 @@ end
     ], mse_loss, mse_loss′)
 
     Q̂ = Net([
-        Layer(nIndicators * LOOK_BACK_PERIOD  + 2, 400, relu, relu′),
-        Layer(400, 300, relu, relu′),
-        Layer(300, 200, relu, relu′),
+        Layer(nIndicators * LOOK_BACK_PERIOD  + 2, 200, relu, relu′),
         Layer(200, 100, relu, relu′),
         Layer(100, 50, relu, relu′),
         Layer(50, 30, relu, relu′),
@@ -74,7 +70,6 @@ end
 
     total_rewards = Float64[]
 
-    capitals = 1000 .+ 200 .* randn(100)
 
     rewards = randn(100) 
     ou_noise = OUNoise(θ=0.15, μ=0.0, σ=0.2, dt=1.0) # Initialize OU noise
@@ -93,10 +88,11 @@ end
         # Track current allocation
         current_market_allocation = 0.0  # Start with 0% allocated (all cash)
         actions = []
+        capitals = [current_capital]      # <-- reset here
         recent_returns = Float64[]
         
 
-        day = rand(1:2)
+        day = rand(1:28)
 
         day_features = month_features[day]
         day_prices = month_prices[day]
@@ -114,6 +110,7 @@ end
             # Generate action (target allocation)
             ε = sample!(ou_noise)
             target_allocation = clamp(quant.π_(s)[1] + ε, -1, 1)
+            target_allocation = target_allocation * 0.5 + 0.5  # Scale to [0, 1]
 
             push!(actions, quant.π_(s)[1]) 
             ou_noise.σ = max(0.05, ou_noise.σ * exp(-0.0005))
@@ -122,7 +119,7 @@ end
             allocation_change = target_allocation - current_market_allocation
             
             # Apply market impact/transaction costs (optional)
-            transaction_cost = 0.025 * abs(allocation_change) * current_capital
+            transaction_cost = 0.00025 * abs(allocation_change) * current_capital
             current_capital -= transaction_cost
             
             # Record capital before market moves
@@ -136,7 +133,6 @@ end
             current_capital += market_return
             
 
-            
             # Calculate reward
             raw_r = market_return - transaction_cost
             push!(rewards, raw_r)
@@ -144,8 +140,9 @@ end
             if length(recent_returns) > 100
                 popfirst!(recent_returns)
             end
-    
-            push!(capitals, current_capital += transaction_cost)
+            better_r = calculate_better_reward(raw_r, current_capital, prev_capital, 20, recent_returns)
+
+            push!(capitals, current_capital)
     
             s′ = vcat([day_features[!, col][t - LOOK_BACK_PERIOD + 2:t+1] for col in names(day_features)]..., [log10(current_capital)])
     
@@ -155,17 +152,18 @@ end
                 d = 1.0
             end
     
-            better_r = calculate_better_reward(raw_r, current_capital, prev_capital, 20, recent_returns)
+            
+            
             add_experience!(quant, s, target_allocation, better_r, s′, d)
             train!(quant, 0.0001, 0.0001, 64)
         end
         
-        if i % 5 == 0 || i == 1
+        if i % 20 == 0 || i == 1
             # Compute benchmark capital over the same episode length
-            benchmark_capital_traj = 1000 * cumprod(1 .+ day_prices[1:episode_length-LOOK_BACK_PERIOD] ./ 100)
+            benchmark_capital_traj = 1000 * cumprod(1 .+ day_prices[LOOK_BACK_PERIOD:LOOK_BACK_PERIOD + episode_length] ./ 100)
 
             # Plot agent's capital trajectory
-            capital_plot = plot(capitals[end - episode_length + 1:end], title="Episode $i Capital over time", 
+            capital_plot = plot(capitals, title="Episode $i Capital over time", 
                 xlabel="Time", ylabel="Capital", label="Agent", lw=1)
 
             # Overlay benchmark trajectory (Buy & Hold)
@@ -185,7 +183,6 @@ end
         push!(total_rewards, mean(episode_rewards))
     end 
     
-    Plots.histogram(capitals, title="Full Capital Distribution", xlabel="Capital", ylabel="Frequency")
     Plots.savefig("plots/capital_distribution/episodes_full.png")
     plt = Plots.plot(1:NUM_EPISODES, total_rewards, xlabel="Episode", ylabel="total reward", title="DDPG Training")
     Plots.savefig("plots/total_rewards.png")

@@ -95,12 +95,14 @@ def read_high_frequency(tickers: list, apikey: str, start_date: str, day_index: 
         json_data = get_jsonparsed_data(url)
         
         hist_df = pd.DataFrame(json_data)[::-1]
+        print(hist_df[-2:])
 
         if hist_df.empty:
             print(f"No data found for {ticker} on {start_date}. Skipping.")
             continue
         hist_df["changeClosePercent"] = hist_df["close"].pct_change().fillna(0) * 100
         hist_df = hist_df[::-1]
+        print(hist_df[:2])
         
         save_path = f".{dsp}data{dsp}{current_date}{dsp}{ticker}_day{day_index}.csv"
         hist_df.to_csv(save_path, index=False)
