@@ -38,7 +38,7 @@ end
 
     ticker = "MSFT"
     LOOK_BACK_PERIOD = 30
-    NUM_EPISODES = 500
+    NUM_EPISODES = 800
 
     month_features, month_prices = get_month_features(ticker, 30,LOOK_BACK_PERIOD)
     nIndicators = ncol(month_features[1])
@@ -49,7 +49,7 @@ end
         Layer(100, 50, relu, relu′),
         Layer(50, 30, relu, relu′),
         Layer(30, 10, relu, relu′),
-        Layer(10, 1, my_tanh, my_tanh′)
+        Layer(10, 1, sigmoid, sigmoid′)
     ], mse_loss, mse_loss′)
 
     Q̂ = Net([
@@ -64,7 +64,7 @@ end
 
     println("STARTING TRAINING FOR $(ticker). Using features: $(names(month_features[1]))")
 
-    γ = 0.95
+    γ = 0.5
     τ = 0.009
     quant = Quant(π_, Q̂, γ, τ)
 
@@ -95,9 +95,9 @@ end
         day = rand(1:28)
 
         day_features = month_features[day]
-        day_prices = month_prices[day]
+        day_change = month_prices[day]
         
-        for t in LOOK_BACK_PERIOD:nrow(day_features) - 1
+        for t in (LOOK_BACK_PERIOD):nrow(day_features) - 1
             if d == 1.0
                 break
             end
@@ -105,15 +105,13 @@ end
             episode_length += 1
     
             # Normalize state
-            s = vcat([day_features[!, col][t - LOOK_BACK_PERIOD + 1:t] for col in names(day_features)]..., [log10(current_capital)])
-        
+            s = vcat([day_features[!, col][t - LOOK_BACK_PERIOD + 1:t] for col in names(day_features)]..., [log10(current_capital)])        
             # Generate action (target allocation)
             ε = sample!(ou_noise)
-            target_allocation = clamp(quant.π_(s)[1] + ε, -1, 1)
-            target_allocation = target_allocation * 0.5 + 0.5  # Scale to [0, 1]
+            target_allocation = clamp(quant.π_(s)[1] + ε, 0, 1)
 
             push!(actions, quant.π_(s)[1]) 
-            ou_noise.σ = max(0.05, ou_noise.σ * exp(-0.0005))
+            ou_noise.σ = max(0.05, ou_noise.σ * exp(-0.00005))
     
             # Calculate change in allocation
             allocation_change = target_allocation - current_market_allocation
@@ -128,7 +126,7 @@ end
             # Apply market movement to existing allocation
             current_market_allocation = target_allocation
 
-            percent_change = day_prices[t + 1]
+            percent_change = day_change[t]
             market_return = current_market_allocation * current_capital * (percent_change / 100.0)
             current_capital += market_return
             
@@ -141,6 +139,9 @@ end
                 popfirst!(recent_returns)
             end
             better_r = calculate_better_reward(raw_r, current_capital, prev_capital, 20, recent_returns)
+            if better_r < 0.0
+                better_r *= 3
+            end
 
             push!(capitals, current_capital)
     
@@ -148,8 +149,10 @@ end
     
             push!(episode_rewards, raw_r)
         
-            if current_capital < 650.0 || t == nrow(day_features) - 1
+            if current_capital < 950.0 || t == nrow(day_features) - 1
                 d = 1.0
+                extra_reward = 10 * (current_capital - 1000.0) / 1000.0
+                better_r += extra_reward
             end
     
             
@@ -160,7 +163,7 @@ end
         
         if i % 20 == 0 || i == 1
             # Compute benchmark capital over the same episode length
-            benchmark_capital_traj = 1000 * cumprod(1 .+ day_prices[LOOK_BACK_PERIOD:LOOK_BACK_PERIOD + episode_length] ./ 100)
+            benchmark_capital_traj = 1000 * cumprod(1 .+ day_change[LOOK_BACK_PERIOD:LOOK_BACK_PERIOD + episode_length] ./ 100)
 
             # Plot agent's capital trajectory
             capital_plot = plot(capitals, title="Episode $i Capital over time", 

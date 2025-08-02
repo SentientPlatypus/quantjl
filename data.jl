@@ -203,13 +203,13 @@ function get_all_features(ticker::String, day::Int, LOOK_BACK_PERIOD::Int=100)
     df.rsi = rsi_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
     df.macd = macd_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
     df.bb_percentb = bb_percentb_series(filepath_name)[LOOK_BACK_PERIOD+1:end]
-    # df.atr = atr_series(filepath_name)
-    #df.vwap = vwap_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
+    #df.atr = atr_series(filepath_name)[LOOK_BACK_PERIOD+1:end]
+    df.vwap = vwap_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
     # df.obv = obv_series(filepath_name)
     # df.sin_tod, df.cos_tod = time_of_day_features(filepath_name)
     
     df_standardized = deepcopy(df)
-    cols_to_standardize = [:rsi, :ema]
+    cols_to_standardize = [:rsi, :ema, :vwap]
     for col in cols_to_standardize
         μ = mean(df[!, col])
         σ = std(df[!, col])
