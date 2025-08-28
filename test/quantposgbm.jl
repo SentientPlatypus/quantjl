@@ -38,7 +38,7 @@ end
 
     ticker = "MSFT"
     LOOK_BACK_PERIOD = 30
-    NUM_EPISODES = 800
+    NUM_EPISODES = 300
 
     month_features, month_prices = get_month_features(ticker, 30,LOOK_BACK_PERIOD)
     nIndicators = ncol(month_features[1])
@@ -64,8 +64,8 @@ end
 
     println("STARTING TRAINING FOR $(ticker). Using features: $(names(month_features[1]))")
 
-    γ = 0.5
-    τ = 0.009
+    γ = 0.99
+    τ = 0.005
     quant = Quant(π_, Q̂, γ, τ)
 
     total_rewards = Float64[]
@@ -117,7 +117,7 @@ end
             allocation_change = target_allocation - current_market_allocation
             
             # Apply market impact/transaction costs (optional)
-            transaction_cost = 0.00025 * abs(allocation_change) * current_capital
+            transaction_cost = 0.0002 * abs(allocation_change) * current_capital
             current_capital -= transaction_cost
             
             # Record capital before market moves
@@ -158,7 +158,7 @@ end
             
             
             add_experience!(quant, s, target_allocation, better_r, s′, d)
-            train!(quant, 0.0001, 0.0001, 64)
+            train!(quant, 3e-4, 1e-4, 0.0001, 256)
         end
         
         if i % 20 == 0 || i == 1

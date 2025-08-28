@@ -44,7 +44,7 @@ function update_target_network!(target_net::Net, main_net::Net, τ::Float64)
 end
 
 
-function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
+function train!(quant::Quant, α_Q::Float64, α_π::Float64, λ::Float64, batch_size::Int)
     """Train the Quant agent using a minibatch from the replay buffer"""
     if length(quant.replay_buffer) < batch_size 
         return  
@@ -59,9 +59,9 @@ function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
         y = r .+ quant.γ * (1 - d) * Q_target_value
 
 
-        step!(quant.Q_, vcat(s, a), y, α, λ, 1/length(minibatch)) # Back with MBSE
+        step!(quant.Q_, vcat(s, a), y, α_Q, λ, 1/length(minibatch)) # Back with MBSE
         
-        ∂Q∂a = step!(quant.Q_, vcat(s, quant.π_(s)), y, α, λ, 1/length(minibatch), false) 
+        ∂Q∂a = step!(quant.Q_, vcat(s, quant.π_(s)), y, α_Q, λ, 1/length(minibatch), false) 
 
         if any(isnan, ∂Q∂a) || any(isinf, ∂Q∂a) || ∂Q∂a == 0.0
             error("invalid gradient: $(∂Q∂a)")
@@ -69,7 +69,7 @@ function train!(quant::Quant, α::Float64, λ::Float64, batch_size::Int)
 
         quant.π_.L′ = (ŷ, y) -> -∂Q∂a[end - quant.π_.output.out_features + 1:end] # GRADIENT ASCENT. 
         #step!(quant.π_, s, [69.420], α, λ, 1/length(minibatch))
-        back_custom!(quant.π_, s, -∂Q∂a[end - quant.π_.output.out_features + 1:end], α, λ, 1/length(minibatch)) 
+        back_custom!(quant.π_, s, -∂Q∂a[end - quant.π_.output.out_features + 1:end], α_π, λ, 1/length(minibatch)) 
     end
 
     # Update target networks: θ_target ← τ * θ + (1 - τ) θ_target
