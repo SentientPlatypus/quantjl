@@ -154,11 +154,12 @@ end
 # 9. Time-of-Day Feature (sin/cos of minutes since open)
 function time_of_day_features(ticker::String)
     df = get_historical_raw(ticker)
-    time = Time.(DateTime.(df.date))
+    # Parse each date string to DateTime using the correct format
+    time = [DateTime(dt, dateformat"yyyy-mm-dd HH:MM:SS") for dt in df.date]
     minutes = [Dates.hour(t)*60 + Dates.minute(t) for t in time]
-    max_minute = maximum(minutes)
-    sin_feat = sin.(2π .* minutes ./ max_minute)
-    cos_feat = cos.(2π .* minutes ./ max_minute)
+    minutes_in_day = 7*60
+    sin_feat = sin.(2π .* minutes ./ minutes_in_day)
+    cos_feat = cos.(2π .* minutes ./ minutes_in_day)
     return sin_feat, cos_feat
 end
 

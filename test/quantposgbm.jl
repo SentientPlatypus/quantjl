@@ -38,7 +38,7 @@ end
 
     ticker = "MSFT"
     LOOK_BACK_PERIOD = 30
-    NUM_EPISODES = 300
+    NUM_EPISODES = 250
 
     month_features, month_prices = get_month_features(ticker, 30,LOOK_BACK_PERIOD)
     nIndicators = ncol(month_features[1])
