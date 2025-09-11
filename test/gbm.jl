@@ -36,7 +36,7 @@ end
     using Random, Plots
 
 
-    TICKER = "2025-06-14/MSFT_day30"
+    TICKER = "2025-09-07/MSFT_day30"
 
     # Ensure reproducibility
     Random.seed!(3)

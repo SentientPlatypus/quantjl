@@ -6,9 +6,7 @@ using StatsBase
 # PROBLEM STATEMENT
 # Maximize the return on investment (ROI) by learning a policy that determines whether to short (-1), hold (0), or long (1) a stock, 
 # given the state of the market over the last 100 days and the amount of capital available.
-
-
-# STATE is last 100 days, along with current capital
+# STATE is last 20 days, along with current capital
 
 using Random
 
@@ -51,6 +49,7 @@ function train!(quant::Quant, α_Q::Float64, α_π::Float64, λ::Float64, batch_
     end
 
     # Sample a minibatch
+    # each transition computes y = r + γ(1 - d) * Q_target(s′, π_target(s′))
     minibatch = [quant.replay_buffer[rand(1:end)] for _ in 1:batch_size]
     ∂Q∂a = 69.0
     for (s, a, r, s′, d) in minibatch
@@ -76,7 +75,6 @@ function train!(quant::Quant, α_Q::Float64, α_π::Float64, λ::Float64, batch_
     update_target_network!(quant.π_target, quant.π_, quant.τ)
     update_target_network!(quant.Q_target, quant.Q_, quant.τ)
 end
-
 
 
 

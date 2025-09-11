@@ -32,13 +32,75 @@ function calculate_better_reward(raw_return, capital, prev_capital, risk_window=
     return reward
 end
 
+function benchmark_episode_reward(day_change, LOOK_BACK_PERIOD; initial_capital=1000.0)
+    current_capital = initial_capital
+    prev_capital = initial_capital
+    recent_returns = Float64[]
+    rewards = Float64[]
+
+    for t in LOOK_BACK_PERIOD:(length(day_change)-1)
+        percent_change = day_change[t+1]
+        market_return = current_capital * (percent_change / 100.0)
+        prev_capital = current_capital
+        current_capital += market_return
+
+        # use the same reward function as agent
+        raw_r = market_return
+        push!(recent_returns, raw_r / prev_capital)
+        if length(recent_returns) > 100
+            popfirst!(recent_returns)
+        end
+
+        better_r = calculate_better_reward(raw_r, current_capital, prev_capital,
+                                           20, recent_returns)
+
+        if better_r < 0.0
+            better_r *= 3
+        end
+
+        if current_capital < 950.0 || t == (length(day_change)-1)
+            extra_reward = 10 * (current_capital - 1000.0) / 1000.0
+            better_r += extra_reward
+        end
+
+        push!(rewards, better_r)
+    end
+
+    return mean(rewards)
+end
+
+function step_allocation(current_market_allocation, target_allocation, current_capital, percent_change, transaction_cost_rate=0.0002)
+    # Calculate change in allocation
+    allocation_change = target_allocation - current_market_allocation
+
+    # Apply market impact/transaction costs
+    transaction_cost = transaction_cost_rate * abs(allocation_change) * current_capital
+    current_capital -= transaction_cost
+
+    # Record capital before market moves
+    prev_capital = current_capital
+
+    # Set new allocation
+    current_market_allocation = target_allocation
+
+    # Apply market return
+    market_return = current_market_allocation * current_capital * (percent_change / 100.0)
+    current_capital += market_return
+
+    # Calculate reward
+    raw_r = market_return - transaction_cost
+
+    return current_market_allocation, current_capital, prev_capital, raw_r, transaction_cost
+end
+
+
 @testset "DDPG" begin
 
     Random.seed!(3)
 
     ticker = "MSFT"
     LOOK_BACK_PERIOD = 30
-    NUM_EPISODES = 250
+    NUM_EPISODES = 200
 
     month_features, month_prices = get_month_features(ticker, 30,LOOK_BACK_PERIOD)
     nIndicators = ncol(month_features[1])
@@ -64,14 +126,13 @@ end
 
     println("STARTING TRAINING FOR $(ticker). Using features: $(names(month_features[1]))")
 
-    γ = 0.99
+    γ = 0.95
     τ = 0.005
     quant = Quant(π_, Q̂, γ, τ)
 
     total_rewards = Float64[]
+    benchmark_rewards = Float64[]
 
-
-    rewards = randn(100) 
     ou_noise = OUNoise(θ=0.15, μ=0.0, σ=0.2, dt=1.0) # Initialize OU noise
 
     
@@ -92,10 +153,12 @@ end
         recent_returns = Float64[]
         
 
-        day = rand(1:28)
+        day = rand(1:20)
 
         day_features = month_features[day]
         day_change = month_prices[day]
+        bench_r = benchmark_episode_reward(day_change, LOOK_BACK_PERIOD)
+        push!(benchmark_rewards, bench_r)
         
         for t in (LOOK_BACK_PERIOD):nrow(day_features) - 1
             if d == 1.0
@@ -108,39 +171,27 @@ end
             s = vcat([day_features[!, col][t - LOOK_BACK_PERIOD + 1:t] for col in names(day_features)]..., [log10(current_capital)])        
             # Generate action (target allocation)
             ε = sample!(ou_noise)
-            target_allocation = clamp(quant.π_(s)[1] + ε, 0, 1)
-
-            push!(actions, quant.π_(s)[1]) 
             ou_noise.σ = max(0.05, ou_noise.σ * exp(-0.00005))
-    
-            # Calculate change in allocation
-            allocation_change = target_allocation - current_market_allocation
-            
-            # Apply market impact/transaction costs (optional)
-            transaction_cost = 0.0002 * abs(allocation_change) * current_capital
-            current_capital -= transaction_cost
-            
-            # Record capital before market moves
-            prev_capital = current_capital
-            
-            # Apply market movement to existing allocation
-            current_market_allocation = target_allocation
 
-            percent_change = day_change[t]
-            market_return = current_market_allocation * current_capital * (percent_change / 100.0)
-            current_capital += market_return
-            
+            a = quant.π_(s)[1]
+            opposite_a = (.5 - a) + .5
+            push!(actions, a)
 
-            # Calculate reward
-            raw_r = market_return - transaction_cost
-            push!(rewards, raw_r)
+            target_allocation = clamp(a + ε, 0, 1)
+
+
+            current_market_allocation, current_capital, prev_capital, raw_r, tc = 
+                step_allocation(current_market_allocation, target_allocation, current_capital, day_change[t+1], 0.002)
+
             push!(recent_returns, raw_r / prev_capital)  # Store return as percentage
+
             if length(recent_returns) > 100
                 popfirst!(recent_returns)
             end
+
             better_r = calculate_better_reward(raw_r, current_capital, prev_capital, 20, recent_returns)
             if better_r < 0.0
-                better_r *= 3
+                better_r *= 4
             end
 
             push!(capitals, current_capital)
@@ -155,8 +206,6 @@ end
                 better_r += extra_reward
             end
     
-            
-            
             add_experience!(quant, s, target_allocation, better_r, s′, d)
             train!(quant, 3e-4, 1e-4, 0.0001, 256)
         end
@@ -188,5 +237,9 @@ end
     
     Plots.savefig("plots/capital_distribution/episodes_full.png")
     plt = Plots.plot(1:NUM_EPISODES, total_rewards, xlabel="Episode", ylabel="total reward", title="DDPG Training")
+
+
+    plot!(plt, 1:NUM_EPISODES, benchmark_rewards,
+        label="Benchmark (100% Market)", color=:red, lw=2)
     Plots.savefig("plots/total_rewards.png")
 end

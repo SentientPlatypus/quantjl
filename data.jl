@@ -195,6 +195,7 @@ function get_all_features(ticker::String, day::Int, LOOK_BACK_PERIOD::Int=100)
     current_date_str = Dates.format(Dates.today(), "yyyy-mm-dd")
 
     filepath_name = "$(current_date_str)/$(ticker)_day$(day)"
+    print(filepath_name)
 
     df.vscores = get_historical_vscores(filepath_name, LOOK_BACK_PERIOD)
     # df.sma = sma_series(filepath_name)
@@ -206,6 +207,10 @@ function get_all_features(ticker::String, day::Int, LOOK_BACK_PERIOD::Int=100)
     df.bb_percentb = bb_percentb_series(filepath_name)[LOOK_BACK_PERIOD+1:end]
     #df.atr = atr_series(filepath_name)[LOOK_BACK_PERIOD+1:end]
     df.vwap = vwap_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
+    sin_feat, cos_feat = time_of_day_features(filepath_name)
+
+    df.sin_feat = sin_feat[LOOK_BACK_PERIOD+1:end]
+    df.cos_feat = cos_feat[LOOK_BACK_PERIOD+1:end]
     # df.obv = obv_series(filepath_name)
     # df.sin_tod, df.cos_tod = time_of_day_features(filepath_name)
     
