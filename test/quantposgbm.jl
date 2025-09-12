@@ -153,7 +153,7 @@ end
         recent_returns = Float64[]
         
 
-        day = rand(1:20)
+        day = rand(1:28)
 
         day_features = month_features[day]
         day_change = month_prices[day]
@@ -180,9 +180,25 @@ end
             target_allocation = clamp(a + ε, 0, 1)
 
 
-            current_market_allocation, current_capital, prev_capital, raw_r, tc = 
-                step_allocation(current_market_allocation, target_allocation, current_capital, day_change[t+1], 0.002)
+            # Calculate change in allocation
+            allocation_change = target_allocation - current_market_allocation
+            
+            # Apply market impact/transaction costs (optional)
+            transaction_cost = 0.0002 * abs(allocation_change) * current_capital
+            current_capital -= transaction_cost
+            
+            # Record capital before market moves
+            prev_capital = current_capital
+            
+            # Apply market movement to existing allocation
+            current_market_allocation = target_allocation
 
+            percent_change = day_change[t]
+            market_return = current_market_allocation * current_capital * (percent_change / 100.0)
+            current_capital += market_return
+
+            raw_r = market_return - transaction_cost
+            
             push!(recent_returns, raw_r / prev_capital)  # Store return as percentage
 
             if length(recent_returns) > 100
@@ -191,15 +207,15 @@ end
 
             better_r = calculate_better_reward(raw_r, current_capital, prev_capital, 20, recent_returns)
             if better_r < 0.0
-                better_r *= 4
+                better_r *= 3
             end
 
             push!(capitals, current_capital)
     
             s′ = vcat([day_features[!, col][t - LOOK_BACK_PERIOD + 2:t+1] for col in names(day_features)]..., [log10(current_capital)])
-    
+
             push!(episode_rewards, raw_r)
-        
+
             if current_capital < 950.0 || t == nrow(day_features) - 1
                 d = 1.0
                 extra_reward = 10 * (current_capital - 1000.0) / 1000.0
