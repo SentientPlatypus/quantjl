@@ -96,19 +96,19 @@ def ddpg_algorithm():
 
 **Policy Gradient**: The actor network is updated using the deterministic policy gradient:
 
-$$\nabla_{\theta^{\pi}} J \approx \mathbb{E}_{s \sim \rho^{\beta}} \left[ \nabla_{\theta^{\pi}} Q(s, a| \theta^Q) \big|_{a=\pi(s|\theta^{\pi})} \nabla_{\theta^{\pi}} \pi(s|\theta^{\pi}) \right]$$
+$$\nabla_{\theta_{\pi}} J \approx \mathbb{E}_{s \sim \rho^{\beta}} \left[ \nabla_{\theta_{\pi}} Q(s, a| \theta_Q) \big|_{a=\pi(s|\theta_{\pi})} \nabla_{\theta_{\pi}} \pi(s|\theta_{\pi}) \right]$$
 
 **Q-Learning Update**: The critic network is updated using the Bellman equation:
 
-$$y_i = r_i + \gamma Q'(s_{i+1}, \pi'(s_{i+1}|\theta^{\pi'})|\theta^{Q'})$$
+$$y_i = r_i + \gamma Q'(s_{i+1}, \pi'(s_{i+1}|\theta_{\pi'})|\theta_{Q'})$$
 
-$$L = \frac{1}{N} \sum_i (y_i - Q(s_i, a_i|\theta^Q))^2$$
+$$L = \frac{1}{N} \sum_i (y_i - Q(s_i, a_i|\theta_Q))^2$$
 
 **Soft Target Updates**: Target networks are updated using exponential moving averages:
 
-$$\theta^{Q'} \leftarrow \tau \theta^Q + (1-\tau) \theta^{Q'}$$
+$$\theta_{Q'} \leftarrow \tau \theta_Q + (1-\tau) \theta_{Q'}$$
 
-$$\theta^{\pi'} \leftarrow \tau \theta^{\pi} + (1-\tau) \theta^{\pi'}$$
+$$\theta_{\pi'} \leftarrow \tau \theta_{\pi} + (1-\tau) \theta_{\pi'}$$
 
 ### State Space
 
@@ -134,10 +134,10 @@ Where:
 
 The reward function incorporates multiple risk management components:
 
-$$r_t = \text{raw\_return}_t - \text{risk\_penalty}_t - \text{capital\_penalty}_t$$
+$$r_t = \\text\{raw\\_return\}_t - \text{risk\_penalty}_t - \text{capital\_penalty}_t$$
 
 **Raw Return**:
-$$\text{raw\_return}_t = a_t \cdot \text{capital\_allocation}_t \cdot \frac{\text{price\_change}_t}{100}$$
+$$\\text\{raw\\_return\}_t = a_t \cdot \text{capital\_allocation}_t \cdot \frac{\text{price\_change}_t}{100}$$
 
 **Risk Penalty** (volatility-based):
 $$\text{risk\_penalty}_t = \lambda_{\text{risk}} \cdot \sigma(\text{recent\_returns})$$
@@ -164,7 +164,7 @@ Where:
 - $Z \sim \mathcal{N}(0,1)$: Standard normal random variable
 
 **V-Score Calculation**:
-$$V_t = \frac{\text{count}(\text{simulated\_paths} > S_t) - \text{expected\_count}}{\text{std}(\text{count\_distribution})}$$
+$$V_t = \frac{\text{count}(\text{simulated\\_paths} > S_t) - \text{expected\_count}}{\text{std}(\text{count\_distribution})}$$
 
 The V-score represents how many simulated future paths exceed the current price, normalized by the distribution's standard deviation.
 
