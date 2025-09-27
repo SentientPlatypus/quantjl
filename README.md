@@ -134,19 +134,23 @@ Where:
 
 The reward function incorporates multiple risk management components:
 
-$$r_t = \\text\{raw\\_return\}_t - \text{risk\_penalty}_t - \text{capital\_penalty}_t$$
-
-**Raw Return**:
-$$\\text\{raw\\_return\}_t = a_t \cdot \text{capital\_allocation}_t \cdot \frac{\text{price\_change}_t}{100}$$
-
-**Risk Penalty** (volatility-based):
-$$\text{risk\_penalty}_t = \lambda_{\text{risk}} \cdot \sigma(\text{recent\_returns})$$
-
-**Capital Protection Penalty**:
-$$\text{capital\_penalty}_t = \begin{cases} 
-0.2 \cdot \frac{1000 - \text{capital}_t}{1000} & \text{if capital}_t < 1000 \\
-0 & \text{otherwise}
-\end{cases}$$
+$$
+r_t = \text{raw\_return}_t - \text{risk\_penalty}_t - \text{capital\_penalty}_t
+$$
+$$
+\text{raw\_return}_t = a_t \cdot \text{capital\_allocation}_t \cdot
+\frac{\text{price\_change}_t}{100}
+$$
+$$
+\text{risk\_penalty}_t = \lambda_{\text{risk}} \cdot \sigma(\text{recent\_returns})
+$$
+$$
+\text{capital\_penalty}_t =
+\begin{cases}
+  0.2 \cdot \dfrac{1000 - \text{capital}_t}{1000}, & \text{if } \text{capital}_t < 1000 \\
+  0, & \text{otherwise}
+\end{cases}
+$$
 
 **Key Insight**: During initial experiments, when trading penalties were set too high, the actor network learned to avoid making any movements whatsoever, effectively learning a "do nothing" policy. This highlights the importance of carefully balancing risk penalties with trading incentives to encourage active learning while maintaining risk management.
 
@@ -164,7 +168,11 @@ Where:
 - $Z \sim \mathcal{N}(0,1)$: Standard normal random variable
 
 **V-Score Calculation**:
-$$V_t = \frac{\text{count}(\text{simulated\\_paths} > S_t) - \text{expected\_count}}{\text{std}(\text{count\_distribution})}$$
+$$
+V_t = \frac{\text{count}(\text{simulated\_paths} > S_t) - \text{expected\_count}}
+           {\text{std}(\text{count\_distribution})}
+$$
+
 
 The V-score represents how many simulated future paths exceed the current price, normalized by the distribution's standard deviation.
 
