@@ -95,13 +95,12 @@ end
 
 
 @testset "DDPG" begin
-
+ 
     Random.seed!(3)
 
     ticker = "MSFT"
-    LOOK_BACK_PERIOD = 30
-    NUM_EPISODES = 200
-
+    LOOK_BACK_PERIOD = 30    
+    NUM_EPISODES = 250
     month_features, month_prices = get_month_features(ticker, 30,LOOK_BACK_PERIOD)
     nIndicators = ncol(month_features[1])
     
@@ -131,10 +130,10 @@ end
     quant = Quant(π_, Q̂, γ, τ)
 
     total_rewards = Float64[]
+    total_better_rewards = Float64[]
     benchmark_rewards = Float64[]
 
     ou_noise = OUNoise(θ=0.15, μ=0.0, σ=0.2, dt=1.0) # Initialize OU noise
-
     
     
     for i in 1:NUM_EPISODES
@@ -143,8 +142,10 @@ end
 
         current_capital = 1000.0
         episode_rewards = Float64[]
+        better_rewards = Float64[]
         d = 0.0
         episode_length = 0
+        replay_warmup = 8000
         
         # Track current allocation
         current_market_allocation = 0.0  # Start with 0% allocated (all cash)
@@ -174,7 +175,6 @@ end
             ou_noise.σ = max(0.05, ou_noise.σ * exp(-0.00005))
 
             a = quant.π_(s)[1]
-            opposite_a = (.5 - a) + .5
             push!(actions, a)
 
             target_allocation = clamp(a + ε, 0, 1)
@@ -193,7 +193,7 @@ end
             # Apply market movement to existing allocation
             current_market_allocation = target_allocation
 
-            percent_change = day_change[t]
+            percent_change = day_change[t + 1]
             market_return = current_market_allocation * current_capital * (percent_change / 100.0)
             current_capital += market_return
 
@@ -218,12 +218,15 @@ end
 
             if current_capital < 950.0 || t == nrow(day_features) - 1
                 d = 1.0
-                extra_reward = 10 * (current_capital - 1000.0) / 1000.0
+                extra_reward = 15 * (current_capital - 1000.0) / 1000.0
                 better_r += extra_reward
             end
+
+            push!(better_rewards, better_r)
     
             add_experience!(quant, s, target_allocation, better_r, s′, d)
-            train!(quant, 3e-4, 1e-4, 0.0001, 256)
+            train!(quant, 3e-4, 5e-5, 0.0001, 256)
+
         end
         
         if i % 20 == 0 || i == 1
@@ -249,6 +252,7 @@ end
         end
 
         push!(total_rewards, mean(episode_rewards))
+        push!(total_better_rewards, mean(better_rewards))
     end 
     
     Plots.savefig("plots/capital_distribution/episodes_full.png")
@@ -258,4 +262,7 @@ end
     plot!(plt, 1:NUM_EPISODES, benchmark_rewards,
         label="Benchmark (100% Market)", color=:red, lw=2)
     Plots.savefig("plots/total_rewards.png")
+
+    better_r = Plots.plot(1:NUM_EPISODES, total_better_rewards, xlabel="Episode", ylabel="better reward", title="DDPG Better Reward Training")
+    Plots.savefig("plots/better_rewards.png")
 end

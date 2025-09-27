@@ -4,9 +4,8 @@ using StatsBase
 
 
 # PROBLEM STATEMENT
-# Maximize the return on investment (ROI) by learning a policy that determines whether to short (-1), hold (0), or long (1) a stock, 
-# given the state of the market over the last 100 days and the amount of capital available.
-# STATE is last 20 days, along with current capital
+# Maximize the return on investment (ROI) by learning a policy that determines whether to hold (0), or long (1) a stock, 
+# given the state of the market over the last 20 minutes of multiple technical indicators.
 
 using Random
 
@@ -42,8 +41,20 @@ function update_target_network!(target_net::Net, main_net::Net, τ::Float64)
 end
 
 
+function add_experience!(quant::Quant, s, a, r, s′, d)
+    """Add an experience tuple to the replay buffer with maximum priority"""
+    push!(quant.replay_buffer, (s, a, r, s′, d))
+    push!(quant.priorities, 1.0)  # New experiences get max priority
+    
+    if length(quant.replay_buffer) > 10_000  
+        popfirst!(quant.replay_buffer)
+        popfirst!(quant.priorities)
+    end
+end
+
+
 function train!(quant::Quant, α_Q::Float64, α_π::Float64, λ::Float64, batch_size::Int)
-    """Train the Quant agent using a minibatch from the replay buffer"""
+    """Train the Quant agent using a minibatch from the replay buffer. Uses the textbook DDPG algorithm."""
     if length(quant.replay_buffer) < batch_size 
         return  
     end
@@ -77,15 +88,56 @@ function train!(quant::Quant, α_Q::Float64, α_π::Float64, λ::Float64, batch_
 end
 
 
+function train_critic!(quant::Quant, α_Q::Float64, λ::Float64, minibatch)
+    bs = length(minibatch)
+    for (s, a, r, s′, d) in minibatch
+        a′ = quant.π_target(s′)
+        Q′ = quant.Q_target(vcat(s′, a′))
+        y  = r .+ quant.γ * (1 .- d) .* Q′              # Bellman target
+        step!(quant.Q_, vcat(s, a), y, α_Q, λ, 1/bs)    # critic SGD on (s,a)→y
+    end
+    update_target_network!(quant.Q_target, quant.Q_, quant.τ)   # soft update critic target
+end
 
-function add_experience!(quant::Quant, s, a, r, s′, d)
-    """Add an experience tuple to the replay buffer with maximum priority"""
-    push!(quant.replay_buffer, (s, a, r, s′, d))
-    push!(quant.priorities, 1.0)  # New experiences get max priority
-    
-    if length(quant.replay_buffer) > 10_000  
-        popfirst!(quant.replay_buffer)
-        popfirst!(quant.priorities)
+function dQ_da(quant::Quant, s::Vector{Float64}, a::Vector{Float64})
+    x = vcat(s, a)
+
+    # Temporarily set dL/dŷ = 1 so backprop returns ∂Q/∂input
+    oldL′ = quant.Q_.L′
+    quant.Q_.L′ = (ŷ, y) -> ones(eltype(ŷ), size(ŷ))
+
+    g_in = step!(quant.Q_, x, [0.0], 0.0, 0.0, 1.0, false)  # no update, just gradients
+    quant.Q_.L′ = oldL′
+
+    a_dim = quant.π_.output.out_features
+    return g_in[end - a_dim + 1:end]   # tail slice is ∂Q/∂a
+end
+
+function train_actor!(quant::Quant, α_π::Float64, λ::Float64, minibatch)
+    bs = length(minibatch)
+    for (s, _, _, _, _) in minibatch
+        a = quant.π_(s)
+        g = dQ_da(quant, s, a)                           # ∂Q/∂a at (s, π(s))
+        back_custom!(quant.π_, s, -g, α_π, λ, 1/bs)      # ascend Q by descending -Q
+    end
+    update_target_network!(quant.π_target, quant.π_, quant.τ)   # soft update actor target
+end
+
+function train_new!(quant::Quant, α_Q::Float64, α_π::Float64, λ::Float64, batch_size::Int;
+                update_critic::Bool=true, update_actor::Bool=true)
+    # Guard: not enough samples
+    if length(quant.replay_buffer) < batch_size
+        return
+    end
+
+    # Uniform sample (keep your own sampler if you change to PER later)
+    minibatch = [quant.replay_buffer[rand(1:end)] for _ in 1:batch_size]
+
+    if update_critic
+        train_critic!(quant, α_Q, λ, minibatch)
+    end
+    if update_actor
+        train_actor!(quant, α_π, λ, minibatch)
     end
 end
 
