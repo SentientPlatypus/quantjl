@@ -168,10 +168,8 @@ Where:
 - $Z \sim \mathcal{N}(0,1)$: Standard normal random variable
 
 **V-Score Calculation**:
-$$
-V_t = \frac{\text{count}(\text{simulatedPaths} > S_t) - \text{expectedCount}}
-           {\text{std}(\text{countDistribution})}
-$$
+$$V_t = \frac{\text{count}(\text{simulatedPaths} > S_t) - \text{expectedCount}}
+           {\text{std}(\text{countDistribution})}$$
 
 
 The V-score represents how many simulated future paths exceed the current price, normalized by the distribution's standard deviation.
@@ -569,3 +567,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 For questions, issues, or contributions, please open an issue or contact the maintainers.
+
