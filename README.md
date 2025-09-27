@@ -135,17 +135,17 @@ Where:
 The reward function incorporates multiple risk management components:
 
 $$
-r_t = \text{raw\_return}_t - \text{risk\_penalty}_t - \text{capital\_penalty}_t
+r_t = \text{rawReturn}_t - \text{riskPenalty}_t - \text{capitalPenalty}_t
 $$
 $$
-\text{raw\_return}_t = a_t \cdot \text{capital\_allocation}_t \cdot
-\frac{\text{price\_change}_t}{100}
+\text{rawReturn}_t = a_t \cdot \text{capitalAllocation}_t \cdot
+\frac{\text{priceChange}_t}{100}
 $$
 $$
-\text{risk\_penalty}_t = \lambda_{\text{risk}} \cdot \sigma(\text{recent\_returns})
+\text{riskPenalty}_t = \lambda_{\text{risk}} \cdot \sigma(\text{recentReturns})
 $$
 $$
-\text{capital\_penalty}_t =
+\text{capitalPenalty}_t =
 \begin{cases}
   0.2 \cdot \dfrac{1000 - \text{capital}_t}{1000}, & \text{if } \text{capital}_t < 1000 \\
   0, & \text{otherwise}
@@ -169,8 +169,8 @@ Where:
 
 **V-Score Calculation**:
 $$
-V_t = \frac{\text{count}(\text{simulated\_paths} > S_t) - \text{expected\_count}}
-           {\text{std}(\text{count\_distribution})}
+V_t = \frac{\text{count}(\text{simulatedPaths} > S_t) - \text{expectedCount}}
+           {\text{std}(\text{countDistribution})}
 $$
 
 
