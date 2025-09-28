@@ -1,6 +1,6 @@
 # QuantJL
 
-**Deep Reinforcement Learning for Algorithmic Trading in Julia**
+**Deep Reinforcement Learning for Algorithmic Trading. In Julia, from scratch.**
 
 [![Julia](https://img.shields.io/badge/Julia-1.8+-blue.svg)](https://julialang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -558,5 +558,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 For questions, issues, or contributions, please open an issue or contact the maintainers.
+
 
 
