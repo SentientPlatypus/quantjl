@@ -5,8 +5,8 @@ using Plots
 using Statistics
 
 include("../data.jl")
-include("../quant.jl")
-include("../data.jl")
+include("../td3.jl")
+
 
 function calculate_better_reward(raw_return, capital, prev_capital, risk_window=20, prev_returns=Float64[], risk_aversion=0.1)
     # Track the return
@@ -69,6 +69,7 @@ function benchmark_episode_reward(day_change, LOOK_BACK_PERIOD; initial_capital=
     return mean(rewards)
 end
 
+
 @testset "DDPG" begin
  
     Random.seed!(3)
@@ -102,7 +103,7 @@ end
 
     γ = 0.95
     τ = 0.005
-    quant = Quant(π_, Q̂, γ, τ)
+    td3 = TD3(π_, Q̂, γ, τ; policy_delay=2, target_noise_std=0.2, target_noise_clip=0.5)
 
     total_rewards = Float64[]
     total_better_rewards = Float64[]
@@ -149,7 +150,7 @@ end
             ε = sample!(ou_noise)
             ou_noise.σ = max(0.05, ou_noise.σ * exp(-0.00005))
 
-            a = quant.π_(s)[1]
+            a = td3.π_(s)[1]
             push!(actions, a)
 
             target_allocation = clamp(a + ε, 0, 1)
@@ -199,8 +200,8 @@ end
 
             push!(better_rewards, better_r)
     
-            add_experience!(quant, s, target_allocation, better_r, s′, d)
-            train!(quant, 3e-4, 5e-5, 0.0001, 256)
+            add_experience!(td3, s, target_allocation, better_r, s′, d)
+            train_td3_step!(td3, 3e-4, 5e-5, 1e-4, 256)
 
         end
         
