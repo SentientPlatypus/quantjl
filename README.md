@@ -1,6 +1,6 @@
 # QuantJL
 
-**Deep Reinforcement Learning for Algorithmic Trading in Julia**
+**Deep Reinforcement Learning for Algorithmic Trading. In Julia, from scratch.**
 
 [![Julia](https://img.shields.io/badge/Julia-1.8+-blue.svg)](https://julialang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -191,30 +191,68 @@ The V-score represents how many simulated future paths exceed the current price,
 ### Architecture Diagram
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Market Data   │───▶│  Feature        │───▶│   Actor         │
-│   (OHLCV)       │    │  Engineering    │    │   Network (π)   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │                       │
-                                ▼                       ▼
-                       ┌─────────────────┐    ┌─────────────────┐
-                       │  Technical      │    │   Action        │
-                       │  Indicators     │    │   (0-1)         │
-                       │  + V-Scores     │    │   + Noise       │
-                       └─────────────────┘    └─────────────────┘
-                                │                       │
-                                ▼                       ▼
-                       ┌─────────────────┐    ┌─────────────────┐
-                       │   Critic        │◀───│   Environment   │
-                       │   Network (Q)    │    │   (Market)      │
-                       │   + Target Q     │    │   + Reward      │
-                       └─────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌─────────────────┐
-                       │  Experience     │
-                       │  Replay Buffer  │
-                       └─────────────────┘
+┌─────────────────┐
+│   Market Data   │  (OHLCV)
+└─────────────────┘
+         │
+         ▼
+┌─────────────────────────────┐
+│     Feature Engineering     │
+│  (Indicators + V-Scores)    │
+└─────────────────────────────┘
+         │
+         ▼
+      state s_t
+         │
+         ├─────────────────────────────┐
+         ▼                             │
+┌─────────────────┐                    │
+│   Actor π(s_t)  │────────────────────┤  action a_t (0–1) + OU noise
+└─────────────────┘                    │
+         │                             │
+         ▼                             │
+┌─────────────────────────────┐        │
+│        Environment          │◀───────┘
+│  (apply a_t, get r_t, s′)   │
+└─────────────────────────────┘
+         │
+         ▼
+(Store transition)
+(s_t, a_t, r_t, s′, d_t)
+         │
+         ▼
+┌─────────────────────────────┐
+│       Replay Buffer         │
+└─────────────────────────────┘
+         │         │
+   sample▼         ▼sample
+┌─────────────────┐   uses targets for y = r + γ(1–d)Q⁻(s′,π⁻(s′))
+│  Critic Q(s,a)  │<───────────────────────────────────────────────┐
+└─────────────────┘                                                │
+    ▲     │ backprop MSE on (Q – y)                                │
+    │     └────────────────────────────────────────────────────────┘
+    │                                        targets
+    │                          ┌───────────────────────────────────┐
+    │                          │                                   │
+    │                   ┌───────────────┐                    ┌───────────────┐
+    │                   │  Target Q⁻    │◀── soft update ───▶│     Q         │
+    │                   └───────────────┘                    └───────────────┘
+    │
+    │ policy gradient via ∇_a Q(s, a)|_{a=π(s)}
+    │
+    │     ┌───────────────────────────────────────────────────────────────┐
+    │     │  g = (∂Q/∂a) at (s, π(s));  backprop through Actor with –g   │
+    │     ▼                                                               │
+┌─────────────────┐                                                       │
+│   Actor π(s)    │<──────────────────────────────────────────────────────┘
+└─────────────────┘
+    ▲                                   targets
+    │                   ┌───────────────┐                    ┌───────────────┐
+    │                   │  Target π⁻    │◀── soft update ───▶│     π         │
+    │                   └───────────────┘                    └───────────────┘
+    │
+    └── (next step uses updated π to act)
+
 ```
 
 ## Getting Started
@@ -410,7 +448,7 @@ INITIAL_CAPITAL = 1000.0  # Starting capital
 MIN_CAPITAL = 650.0       # Episode termination threshold
 ```
 
-### Checkpointing & Resuming
+
 
 The system automatically saves:
 - Training progress plots in `plots/` directory
@@ -478,32 +516,6 @@ Training generates several visualization files:
 ### Data Privacy
 
 - **API Keys**: Stored locally in `apikey` file (excluded from version control)
-- **Market Data**: Downloaded data remains local and is not shared
-- **No Personal Data**: System only processes public market data
-
-### Responsible AI Considerations
-
-- **Risk Management**: Built-in capital protection and volatility penalties
-- **Transparency**: All trading decisions are logged and can be analyzed
-- **Limitations**: System is designed for research purposes, not live trading
-- **Bias Mitigation**: Uses multiple technical indicators to reduce single-source bias
-
-## Limitations & Known Issues
-
-### Current Limitations
-
-1. **Action Space**: Currently limited to hold (0) and long (1) positions only
-2. **Single Asset**: Training is performed on individual assets separately
-3. **No Transaction Costs**: Model doesn't account for trading fees and slippage
-4. **Market Regime**: Performance may vary across different market conditions
-5. **Overfitting Risk**: Model may overfit to specific time periods
-
-### Known Issues
-
-- **Gradient Explosion**: Occasional gradient instability during training
-- **Memory Usage**: Large replay buffer can consume significant memory
-- **API Rate Limits**: Financial Modeling Prep API has rate limitations
-- **Data Quality**: Some historical data may contain gaps or errors
 
 ### Performance Considerations
 
@@ -512,30 +524,11 @@ Training generates several visualization files:
 - **Data Storage**: High-frequency data requires significant disk space
 
 ## Roadmap
-
-### Short Term (Next 3 months)
-
 - [ ] **Short Selling Support**: Extend action space to include short positions (-1)
 - [ ] **Multi-Asset Training**: Implement portfolio-level optimization
 - [ ] **Transaction Costs**: Add realistic trading costs to reward function
 - [ ] **Hyperparameter Optimization**: Automated hyperparameter tuning
 - [ ] **GPU Support**: CUDA acceleration for faster training
-
-### Medium Term (3-6 months)
-
-- [ ] **Advanced Architectures**: Implement SAC, TD3, or PPO algorithms
-- [ ] **Feature Engineering**: Additional technical indicators and market microstructure features
-- [ ] **Backtesting Framework**: Comprehensive historical performance evaluation
-- [ ] **Real-time Integration**: Live market data integration
-- [ ] **Risk Metrics**: Advanced risk management and position sizing
-
-### Long Term (6+ months)
-
-- [ ] **Multi-Market Support**: Extend to forex, crypto, and commodities
-- [ ] **Ensemble Methods**: Combine multiple models for robust predictions
-- [ ] **Explainable AI**: Model interpretability and decision explanation
-- [ ] **Production Deployment**: Cloud deployment and API services
-- [ ] **Regulatory Compliance**: Integration with financial regulations
 
 ## Contributing
 
@@ -560,11 +553,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgments
 
 - Financial Modeling Prep for market data API
-- Julia community for excellent ML ecosystem
-- Deep RL research community for DDPG algorithm
-- Contributors and testers
+- OpenAI Spinning Up DDPG page.
 
 ---
 
 For questions, issues, or contributions, please open an issue or contact the maintainers.
+
+
+
 
