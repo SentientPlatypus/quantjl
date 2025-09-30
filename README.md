@@ -24,7 +24,6 @@ Traditional trading strategies often rely on static rules or simple technical in
 - **Target networks** for stable training with soft updates
 - **Ornstein-Uhlenbeck noise** for exploration during training
 - **Comprehensive visualization** tools for monitoring training progress
-- **Multi-asset support** (tested with MSFT, AAPL, NVDA, PLTR, SPY)
 
 ## Architecture Overview
 
@@ -558,6 +557,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 For questions, issues, or contributions, please open an issue or contact the maintainers.
+
 
 
 
