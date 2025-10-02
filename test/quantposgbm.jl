@@ -75,7 +75,7 @@ end
 
     ticker = "MSFT"
     LOOK_BACK_PERIOD = 30    
-    NUM_EPISODES = 250
+    NUM_EPISODES = 200
     month_features, month_prices = get_month_features(ticker, 30,LOOK_BACK_PERIOD)
     nIndicators = ncol(month_features[1])
     
@@ -120,8 +120,7 @@ end
         better_rewards = Float64[]
         d = 0.0
         episode_length = 0
-        replay_warmup = 8000
-        
+
         # Track current allocation
         current_market_allocation = 0.0  # Start with 0% allocated (all cash)
         actions = []
@@ -144,7 +143,7 @@ end
             episode_length += 1
     
             # Normalize state
-            s = vcat([day_features[!, col][t - LOOK_BACK_PERIOD + 1:t] for col in names(day_features)]..., [log10(current_capital)])        
+            s = vcat([day_features[!, col][t - LOOK_BACK_PERIOD + 1:t] for col in names(day_features)]..., [current_market_allocation])        
             # Generate action (target allocation)
             ε = sample!(ou_noise)
             ou_noise.σ = max(0.05, ou_noise.σ * exp(-0.00005))
@@ -187,7 +186,7 @@ end
 
             push!(capitals, current_capital)
     
-            s′ = vcat([day_features[!, col][t - LOOK_BACK_PERIOD + 2:t+1] for col in names(day_features)]..., [log10(current_capital)])
+            s′ = vcat([day_features[!, col][t - LOOK_BACK_PERIOD + 2:t+1] for col in names(day_features)]..., [current_market_allocation])
 
             push!(episode_rewards, raw_r)
 

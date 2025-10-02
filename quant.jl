@@ -68,7 +68,6 @@ function train!(quant::Quant, α_Q::Float64, α_π::Float64, λ::Float64, batch_
 
         y = r .+ quant.γ * (1 - d) * Q_target_value
 
-
         step!(quant.Q_, vcat(s, a), y, α_Q, λ, 1/length(minibatch)) # Back with MBSE
         
         ∂Q∂a = step!(quant.Q_, vcat(s, quant.π_(s)), y, α_Q, λ, 1/length(minibatch), false) 
@@ -86,61 +85,6 @@ function train!(quant::Quant, α_Q::Float64, α_π::Float64, λ::Float64, batch_
     update_target_network!(quant.π_target, quant.π_, quant.τ)
     update_target_network!(quant.Q_target, quant.Q_, quant.τ)
 end
-
-
-function train_critic!(quant::Quant, α_Q::Float64, λ::Float64, minibatch)
-    bs = length(minibatch)
-    for (s, a, r, s′, d) in minibatch
-        a′ = quant.π_target(s′)
-        Q′ = quant.Q_target(vcat(s′, a′))
-        y  = r .+ quant.γ * (1 .- d) .* Q′              # Bellman target
-        step!(quant.Q_, vcat(s, a), y, α_Q, λ, 1/bs)    # critic SGD on (s,a)→y
-    end
-    update_target_network!(quant.Q_target, quant.Q_, quant.τ)   # soft update critic target
-end
-
-function dQ_da(quant::Quant, s::Vector{Float64}, a::Vector{Float64})
-    x = vcat(s, a)
-
-    # Temporarily set dL/dŷ = 1 so backprop returns ∂Q/∂input
-    oldL′ = quant.Q_.L′
-    quant.Q_.L′ = (ŷ, y) -> ones(eltype(ŷ), size(ŷ))
-
-    g_in = step!(quant.Q_, x, [0.0], 0.0, 0.0, 1.0, false)  # no update, just gradients
-    quant.Q_.L′ = oldL′
-
-    a_dim = quant.π_.output.out_features
-    return g_in[end - a_dim + 1:end]   # tail slice is ∂Q/∂a
-end
-
-function train_actor!(quant::Quant, α_π::Float64, λ::Float64, minibatch)
-    bs = length(minibatch)
-    for (s, _, _, _, _) in minibatch
-        a = quant.π_(s)
-        g = dQ_da(quant, s, a)                           # ∂Q/∂a at (s, π(s))
-        back_custom!(quant.π_, s, -g, α_π, λ, 1/bs)      # ascend Q by descending -Q
-    end
-    update_target_network!(quant.π_target, quant.π_, quant.τ)   # soft update actor target
-end
-
-function train_new!(quant::Quant, α_Q::Float64, α_π::Float64, λ::Float64, batch_size::Int;
-                update_critic::Bool=true, update_actor::Bool=true)
-    # Guard: not enough samples
-    if length(quant.replay_buffer) < batch_size
-        return
-    end
-
-    # Uniform sample (keep your own sampler if you change to PER later)
-    minibatch = [quant.replay_buffer[rand(1:end)] for _ in 1:batch_size]
-
-    if update_critic
-        train_critic!(quant, α_Q, λ, minibatch)
-    end
-    if update_actor
-        train_actor!(quant, α_π, λ, minibatch)
-    end
-end
-
 
 
 
