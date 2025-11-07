@@ -36,13 +36,6 @@ function get_historical_vscores(ticker::String, OBS::Int=100, EPOCH::Int=1000, E
 end
 
 
-# 1. Simple Moving Average (SMA)
-function sma_series(ticker::String, window::Int=14)
-    df = get_historical_raw(ticker)
-    sma = [i < window ? NaN : mean(df.close[i-window+1:i]) for i in 1:nrow(df)]
-    return sma
-end
-
 # 2. Exponential Moving Average (EMA)
 function ema_series(ticker::String, window::Int=14)
     df = get_historical_raw(ticker)
@@ -108,24 +101,27 @@ function rsi_series(ticker::String, window::Int=14)
 end
 
 # 5. Bollinger Band %B
-function bb_percentb_series(ticker::String, window::Int=20)
+function bb_percentb_series_safe(ticker::String, window::Int=20)
     df = get_historical_raw(ticker)
-    ma = [i < window ? NaN : mean(df.close[i-window+1:i]) for i in 1:nrow(df)]
-    stddev = [i < window ? NaN : std(df.close[i-window+1:i]) for i in 1:nrow(df)]
-    upper = ma .+ 2 .* stddev
-    lower = ma .- 2 .* stddev
-    percentb = (df.close .- lower) ./ (upper .- lower)
+    n  = nrow(df)
+    ma = [i < window ? NaN : mean(@view df.close[i-window+1:i]) for i in 1:n]
+    sd = [i < window ? NaN : std(@view df.close[i-window+1:i])  for i in 1:n]
+
+    upper = ma .+ 2 .* sd
+    lower = ma .- 2 .* sd
+    bandw = upper .- lower
+
+    percentb = similar(df.close, Float64)
+    @inbounds for i in 1:n
+        if isnan(bandw[i]) || bandw[i] ≈ 0.0
+            # If the band collapses, price == ma; set %B to 0.5 (center of band)
+            percentb[i] = 0.5
+        else
+            percentb[i] = (df.close[i] - lower[i]) / bandw[i]
+        end
+    end
     return percentb
 end
-
-# 6. ATR
-function atr_series(ticker::String, window::Int=14)
-    df = get_historical_raw(ticker)
-    tr = [maximum([df.high[i]-df.low[i], abs(df.high[i]-df.close[i-1]), abs(df.low[i]-df.close[i-1])]) for i in 2:nrow(df)]
-    atr = [NaN; movmean(tr, window)]
-    return atr
-end
-
 # 7. VWAP
 function vwap_series(ticker::String)
     df = get_historical_raw(ticker)
@@ -133,22 +129,6 @@ function vwap_series(ticker::String)
     cum_vp = cumsum(typical_price .* df.volume)
     cum_vol = cumsum(df.volume)
     return cum_vp ./ cum_vol
-end
-
-# 8. OBV
-function obv_series(ticker::String)
-    df = get_historical_raw(ticker)
-    obv = zeros(Float64, nrow(df))
-    for i in 2:nrow(df)
-        if df.close[i] > df.close[i-1]
-            obv[i] = obv[i-1] + df.volume[i]
-        elseif df.close[i] < df.close[i-1]
-            obv[i] = obv[i-1] - df.volume[i]
-        else
-            obv[i] = obv[i-1]
-        end
-    end
-    return obv
 end
 
 # 9. Time-of-Day Feature (sin/cos of minutes since open)
@@ -187,6 +167,11 @@ function macd_series(ticker::String; short_period::Int = 12, long_period::Int = 
     return histogram
 end
 
+function volume_series(ticker::String)
+    df = get_historical_raw(ticker)
+    log10_volume = log.(1000, df.volume .+ 1)
+    return log10_volume
+end
 
 # Combine all features
 function get_all_features(ticker::String, day::Int, LOOK_BACK_PERIOD::Int=100)
@@ -195,30 +180,26 @@ function get_all_features(ticker::String, day::Int, LOOK_BACK_PERIOD::Int=100)
     current_date_str = Dates.format(Dates.today(), "yyyy-mm-dd")
 
     filepath_name = "$(current_date_str)/$(ticker)_day$(day)"
-    print(filepath_name)
 
     df.vscores = get_historical_vscores(filepath_name, LOOK_BACK_PERIOD)
-    # df.sma = sma_series(filepath_name)
 
-
-    df.ema = ema_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
-    df.rsi = rsi_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
-    df.macd = macd_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
-    df.bb_percentb = bb_percentb_series(filepath_name)[LOOK_BACK_PERIOD+1:end]
-    #df.atr = atr_series(filepath_name)[LOOK_BACK_PERIOD+1:end]
-    df.vwap = vwap_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  # Adjust for LOOK_BACK_PERIOD
+    df.ema = ema_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  
+    # df.volume = volume_series(filepath_name)[LOOK_BACK_PERIOD+1:end]
+    df.rsi = rsi_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  
+    df.macd = macd_series(filepath_name)[LOOK_BACK_PERIOD+1:end] 
+    df.bb_percentb = bb_percentb_series_safe(filepath_name)[LOOK_BACK_PERIOD+1:end]
+    # df.vwap = vwap_series(filepath_name)[LOOK_BACK_PERIOD+1:end] 
     sin_feat, cos_feat = time_of_day_features(filepath_name)
 
     df.sin_feat = sin_feat[LOOK_BACK_PERIOD+1:end]
     df.cos_feat = cos_feat[LOOK_BACK_PERIOD+1:end]
-    # df.obv = obv_series(filepath_name)
-    # df.sin_tod, df.cos_tod = time_of_day_features(filepath_name)
     
     df_standardized = deepcopy(df)
-    cols_to_standardize = [:rsi, :ema, :vwap]
+    cols_to_standardize = [:rsi, :ema]
     for col in cols_to_standardize
         μ = mean(df[!, col])
         σ = std(df[!, col])
+        σ = max(σ, 1e-8)  # epsilon floor
         df_standardized[!, col] = (df[!, col] .- μ) ./ σ
     end
 

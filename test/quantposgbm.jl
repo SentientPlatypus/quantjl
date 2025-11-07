@@ -73,7 +73,7 @@ end
  
     Random.seed!(3)
 
-    ticker = "MSFT"
+    ticker = "ASST"
     LOOK_BACK_PERIOD = 30    
     NUM_EPISODES = 200
     month_features, month_prices = get_month_features(ticker, 30,LOOK_BACK_PERIOD)
@@ -100,7 +100,7 @@ end
 
     println("STARTING TRAINING FOR $(ticker). Using features: $(names(month_features[1]))")
 
-    γ = 0.95
+    γ = 0.99
     τ = 0.005
     quant = Quant(π_, Q̂, γ, τ)
 
@@ -181,7 +181,7 @@ end
 
             better_r = calculate_better_reward(raw_r, current_capital, prev_capital, 20, recent_returns)
             if better_r < 0.0
-                better_r *= 3
+                better_r *= 1.5
             end
 
             push!(capitals, current_capital)

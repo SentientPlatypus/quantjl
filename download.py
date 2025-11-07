@@ -58,7 +58,6 @@ def read_historical(tickers:list, apikey):
             df = df.merge(hist, on="date")
         
     df = df.drop(columns=["date"])
-    df.to_csv(f".{dsp}data{dsp}merge.csv", index=False)
 
 
 
