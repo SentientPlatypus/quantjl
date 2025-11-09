@@ -184,7 +184,7 @@ function get_all_features(ticker::String, day::Int, LOOK_BACK_PERIOD::Int=100)
     df.vscores = get_historical_vscores(filepath_name, LOOK_BACK_PERIOD)
 
     df.ema = ema_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  
-    # df.volume = volume_series(filepath_name)[LOOK_BACK_PERIOD+1:end]
+    df.volume = volume_series(filepath_name)[LOOK_BACK_PERIOD+1:end]
     df.rsi = rsi_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  
     df.macd = macd_series(filepath_name)[LOOK_BACK_PERIOD+1:end] 
     df.bb_percentb = bb_percentb_series_safe(filepath_name)[LOOK_BACK_PERIOD+1:end]

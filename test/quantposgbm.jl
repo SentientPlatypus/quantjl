@@ -85,7 +85,7 @@ end
         Layer(100, 50, relu, relu′),
         Layer(50, 30, relu, relu′),
         Layer(30, 10, relu, relu′),
-        Layer(10, 1, sigmoid, sigmoid′)
+        Layer(10, 1, my_tanh, my_tanh′)
     ], mse_loss, mse_loss′)
 
     Q̂ = Net([
@@ -151,7 +151,7 @@ end
             a = quant.π_(s)[1]
             push!(actions, a)
 
-            target_allocation = clamp(a + ε, 0, 1)
+            target_allocation = clamp(a + ε, -1, 1)
 
 
             # Calculate change in allocation
@@ -230,11 +230,11 @@ end
     end 
     
     Plots.savefig("plots/capital_distribution/episodes_full.png")
-    plt = Plots.plot(1:NUM_EPISODES, total_rewards, xlabel="Episode", ylabel="total reward", title="DDPG Training")
+    plt = Plots.plot(1:NUM_EPISODES, total_rewards, xlabel="Episode", ylabel="total reward", title="total episodic reward for DDPG Agent. $(ticker)")
 
 
     plot!(plt, 1:NUM_EPISODES, benchmark_rewards,
-        label="Benchmark (100% Market)", color=:red, lw=2)
+        label="Benchmark (100% Market)", color=:red, lw=1)
     Plots.savefig("plots/total_rewards.png")
 
     better_r = Plots.plot(1:NUM_EPISODES, total_better_rewards, xlabel="Episode", ylabel="better reward", title="DDPG Better Reward Training")
