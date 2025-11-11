@@ -181,7 +181,7 @@ end
 
             better_r = calculate_better_reward(raw_r, current_capital, prev_capital, 20, recent_returns)
             if better_r < 0.0
-                better_r *= 1.5
+                better_r *= 0.75
             end
 
             push!(capitals, current_capital)
@@ -230,11 +230,11 @@ end
     end 
     
     Plots.savefig("plots/capital_distribution/episodes_full.png")
-    plt = Plots.plot(1:NUM_EPISODES, total_rewards, xlabel="Episode", ylabel="total reward", title="total episodic reward for DDPG Agent. $(ticker)")
+    plt = Plots.plot(1:NUM_EPISODES, benchmark_rewards, xlabel="Episode", ylabel="total reward", title="total episodic reward for DDPG Agent. $(ticker)", color=:red, lw=1, label="Benchmark (Buy & Hold)")
 
 
-    plot!(plt, 1:NUM_EPISODES, benchmark_rewards,
-        label="Benchmark (100% Market)", color=:red, lw=1)
+    plot!(plt, 1:NUM_EPISODES, total_rewards,
+        label="Agent", color=:blue, lw=1)
     Plots.savefig("plots/total_rewards.png")
 
     better_r = Plots.plot(1:NUM_EPISODES, total_better_rewards, xlabel="Episode", ylabel="better reward", title="DDPG Better Reward Training")
