@@ -90,6 +90,8 @@ def read_high_frequency(tickers: list, apikey: str, start_date: str, day_index: 
         else:
             url += f"/{ticker}?from={start_date}&to={end_date}&apikey={apikey}"
         
+        print(url)
+        
 
         json_data = get_jsonparsed_data(url)
         
@@ -144,7 +146,7 @@ def main():
     tickers = sys.argv[1:]
     apikey = open(f".{dsp}apikey", "r").readline().strip()
     
-    #read_historical(tickers, apikey)
+    # read_historical(tickers, apikey)
     read_past_month(tickers, apikey, days=30)
 
 if __name__ == "__main__":
