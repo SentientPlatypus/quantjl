@@ -85,7 +85,7 @@ end
         Layer(100, 50, relu, relu′),
         Layer(50, 30, relu, relu′),
         Layer(30, 10, relu, relu′),
-        Layer(10, 1, my_tanh, my_tanh′)
+        Layer(10, 1, sigmoid, sigmoid′)
     ], mse_loss, mse_loss′)
 
     Q̂ = Net([
@@ -151,7 +151,7 @@ end
             a = quant.π_(s)[1]
             push!(actions, a)
 
-            target_allocation = clamp(a + ε, -1, 1)
+            target_allocation = clamp(a + ε, 0, 1)
 
 
             # Calculate change in allocation

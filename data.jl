@@ -32,7 +32,18 @@ end
 # 0. VSCORES.
 function get_historical_vscores(ticker::String, OBS::Int=100, EPOCH::Int=1000, EXT::Int=20, seed::Int=3)
     raw = get_historical_raw_list(ticker)
-    return vscore(raw, OBS, EPOCH, EXT)
+    vscores = vscore(raw, OBS, EPOCH, EXT)
+    sell_signal = [v - 1.8 for v in vscores]
+    buy_signal  = [-1.8 - v for v in vscores]
+    return vscores
+end
+
+function buy_sell_vscore_signals(ticker::String, OBS::Int=100, EPOCH::Int=1000, EXT::Int=20, seed::Int=3)
+    raw = get_historical_raw_list(ticker)
+    vscores = vscore(raw, OBS, EPOCH, EXT)
+    sell_signal = [max(0.0, v - 1.5) for v in vscores]
+    buy_signal  = [max(0.0, -1.5 - v) for v in vscores]
+    return buy_signal, sell_signal
 end
 
 
@@ -181,7 +192,10 @@ function get_all_features(ticker::String, day::Int, LOOK_BACK_PERIOD::Int=100)
 
     filepath_name = "$(current_date_str)/$(ticker)_day$(day)"
 
-    df.vscores = get_historical_vscores(filepath_name, LOOK_BACK_PERIOD)
+    buy_sig, sell_sig = buy_sell_vscore_signals(filepath_name, LOOK_BACK_PERIOD)
+
+    df.buy_sig = buy_sig
+    df.sell_sig = sell_sig
 
     df.ema = ema_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  
     df.volume = volume_series(filepath_name)[LOOK_BACK_PERIOD+1:end]

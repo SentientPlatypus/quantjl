@@ -118,6 +118,10 @@ def read_high_frequency(tickers: list, apikey: str, start_date: str, day_index: 
     df.iloc[-1, -1] = 0.0
     return df
 
+
+
+
+
 def read_past_month(tickers: list, apikey: str, days: int = 30):
     """
     Calls `read_high_frequency` for the past `days` business days (weekdays only).
@@ -144,7 +148,7 @@ def read_past_month(tickers: list, apikey: str, days: int = 30):
 
 def main():
     tickers = sys.argv[1:]
-    apikey = open(f".{dsp}apikey", "r").readline().strip()
+    apikey = open(f".{dsp}_apikey", "r").readline().strip()
     
     # read_historical(tickers, apikey)
     read_past_month(tickers, apikey, days=30)
