@@ -1,7 +1,7 @@
 import yfinance as yf
 import pandas as pd
 
-def download_minutes(ticker, interval="1m", period="7d", outfile=None):
+def download_minutes(ticker, interval="1m", period="7d", outfile=None, prepost=False):
     """
     Downloads minute-level OHLCV data from Yahoo Finance
     and saves it in the exact CSV format you need.
@@ -9,7 +9,7 @@ def download_minutes(ticker, interval="1m", period="7d", outfile=None):
     interval: "1m", "2m", "5m", "15m", "30m", "60m"
     period: up to "30d" for minute data
     """
-    df = yf.download(ticker, interval=interval, period=period)
+    df = yf.download(ticker, interval=interval, period=period, prepost=prepost)
 
     # Clean index to string timestamps
     df = df.reset_index()
@@ -39,8 +39,6 @@ def download_minutes(ticker, interval="1m", period="7d", outfile=None):
 
 
 # Example usage
-df = download_minutes("MSFT", interval="1m", period="7d",
-                      outfile="MSFT.csv")
-
-df.to_csv("SPY.csv", index=False)
+df = download_minutes("SUIG", interval="1m", period="7d",
+                      outfile="data/SUIG.csv", prepost=True)
 print(df.head())
