@@ -5,7 +5,8 @@
 [![Julia](https://img.shields.io/badge/Julia-1.8+-blue.svg)](https://julialang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Research-orange.svg)]()
-
+![alt text](image.png)
+![alt text](backtests/SUIG.png)
 ## Introduction
 
 QuantJL is a sophisticated algorithmic trading system that uses Deep Deterministic Policy Gradient (DDPG) reinforcement learning to optimize stock trading strategies. The system learns to make optimal trading decisions by analyzing high-frequency market data and technical indicators to maximize return on investment while managing risk.
