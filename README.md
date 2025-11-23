@@ -5,8 +5,7 @@
 [![Julia](https://img.shields.io/badge/Julia-1.8+-blue.svg)](https://julialang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Research-orange.svg)]()
-![alt text](image.png)
-![alt text](backtests/SUIG.png)
+![alt text](plots/gbm_path_full.png)
 ## Introduction
 
 QuantJL is a sophisticated algorithmic trading system that uses Deep Deterministic Policy Gradient (DDPG) reinforcement learning to optimize stock trading strategies. The system learns to make optimal trading decisions by analyzing high-frequency market data and technical indicators to maximize return on investment while managing risk.
@@ -14,6 +13,13 @@ QuantJL is a sophisticated algorithmic trading system that uses Deep Determinist
 ### Problem Statement
 
 Traditional trading strategies often rely on static rules or simple technical indicators that fail to adapt to changing market conditions. QuantJL addresses this by implementing a continuous control reinforcement learning agent that learns optimal trading policies through interaction with market data. The agent determines whether to **hold (0)** or **long (1)** positions based on the state of the market over the last 20 minutes of multiple technical indicators.
+
+### Results
+Unfortunately, the average reward from each episode seems to plateau at around -0.01 cents, which I believe to be largely due to the high transaction costs.
+![alt text](total_rewards_nice_graph.png)
+
+However, the brownian motion indicator later discussed the **vscore formulation** part of this readme, shows promise, as the movement of an asset changes direction after a critical value. For example, we take a long position on an asset if the vscore goes below -2, and sell it after it goes above +2. The following is one of many example backtests done on this strategy.
+![alt text](backtests/SUIG.png)
 
 ## Key Features
 
