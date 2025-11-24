@@ -15,11 +15,18 @@ QuantJL is a sophisticated algorithmic trading system that uses Deep Determinist
 Traditional trading strategies often rely on static rules or simple technical indicators that fail to adapt to changing market conditions. QuantJL addresses this by implementing a continuous control reinforcement learning agent that learns optimal trading policies through interaction with market data. The agent determines whether to **hold (0)** or **long (1)** positions based on the state of the market over the last 20 minutes of multiple technical indicators.
 
 ### Results
-Unfortunately, the average reward from each episode seems to plateau at around -0.01 cents, which I believe to be largely due to the high transaction costs.
+Unfortunately, the average reward from each episode seems to plateau at around -0.01 cents, which I believe to be largely due to transaction costs. This behavior is consistent with high-frequency environments in which transaction costs dominate per-timestep returns. Because the RL agent must output an action every single minute, even small position adjustments generate cumulative friction that overwhelms micro-profits.
 ![alt text](total_rewards_nice_graph.png)
 
 However, the brownian motion indicator later discussed the **vscore formulation** part of this readme, shows promise, as the movement of an asset changes direction after a critical value. For example, we take a long position on an asset if the vscore goes below -2, and sell it after it goes above +2. The following is one of many example backtests done on this strategy.
 ![alt text](backtests/SUIG.png)
+
+**However**, the backtests enforce a **trade-cooldown of ten minutes** while the reinforcement learning algorithm does not. 
+This throttling drastically reduces transaction costs and prevents repeated oscillation around the threshold. Consequently:
+
+* The strategy trades only when the signal is strong,
+* avoids noise-driven whipsaws, and
+* pays transaction costs orders of magnitude less frequently than the RL agent.
 
 ## Key Features
 
