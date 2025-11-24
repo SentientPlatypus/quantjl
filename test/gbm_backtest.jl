@@ -11,7 +11,6 @@ function backtest_vscore_strategy(ticker::String;
                                   initial_capital::Float64 = 1000.0,
                                   cooldown_minutes::Int = 30)
 
-    # 1. Load price/time data
     df = get_historical_raw(ticker)
     prices = Float64.(df.close)
 
@@ -21,7 +20,6 @@ function backtest_vscore_strategy(ticker::String;
         DateTime.(df.date)
     end
 
-    # 2. Compute vscores
     vscores = get_historical_vscores(ticker)
     n = min(length(prices), length(vscores))
 
@@ -29,7 +27,6 @@ function backtest_vscore_strategy(ticker::String;
     times   = times[end-n+1:end]
     vscores = vscores[end-n+1:end]
 
-    # 3. Backtest
     capital = similar(prices, Float64)
     position = 0.0
     cash = initial_capital
@@ -38,9 +35,8 @@ function backtest_vscore_strategy(ticker::String;
     benchmark_shares  = initial_capital / prices[1]
     benchmark_capital = similar(prices, Float64)
 
-    # --- store trade events ---
     trade_times = DateTime[]
-    trade_type  = Symbol[]    # :buy or :sell
+    trade_type  = Symbol[]
 
     for i in 1:n
         price = prices[i]
@@ -76,7 +72,7 @@ function backtest_vscore_strategy(ticker::String;
         benchmark_capital[i] = benchmark_shares * price
     end
 
-    # 4. Plots
+
     p_price = plot(times, prices, xlabel="Time", ylabel="Price",
                    title="$ticker Price", legend=false)
 
@@ -90,7 +86,6 @@ function backtest_vscore_strategy(ticker::String;
                      label="Strategy")
     plot!(p_capital, times, benchmark_capital, label="Buy & Hold")
 
-    # --- add vertical trade lines to all plots ---
     for (t, typ) in zip(trade_times, trade_type)
         col = (typ == :buy) ? :green : :red
         plot!(p_price,  [t, t], [minimum(prices),  maximum(prices)],  color=col, lw=1, label=false)

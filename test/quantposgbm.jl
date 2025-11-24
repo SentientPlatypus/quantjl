@@ -108,7 +108,7 @@ end
     total_better_rewards = Float64[]
     benchmark_rewards = Float64[]
 
-    ou_noise = OUNoise(θ=0.15, μ=0.0, σ=0.2, dt=1.0) # Initialize OU noise
+    ou_noise = OUNoise(θ=0.15, μ=0.0, σ=0.2, dt=1.0)
     
     
     for i in 1:NUM_EPISODES
@@ -122,9 +122,9 @@ end
         episode_length = 0
 
         # Track current allocation
-        current_market_allocation = 0.0  # Start with 0% allocated (all cash)
+        current_market_allocation = 0.0
         actions = []
-        capitals = [current_capital]      # <-- reset here
+        capitals = [current_capital]
         recent_returns = Float64[]
         
 
@@ -142,7 +142,6 @@ end
     
             episode_length += 1
     
-            # Normalize state
             s = vcat([day_features[!, col][t - LOOK_BACK_PERIOD + 1:t] for col in names(day_features)]..., [current_market_allocation])        
             # Generate action (target allocation)
             ε = sample!(ou_noise)
