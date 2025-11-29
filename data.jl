@@ -46,6 +46,16 @@ function buy_sell_vscore_signals(ticker::String, OBS::Int=100, EPOCH::Int=1000, 
     return buy_signal, sell_signal
 end
 
+function derivative(data::Vector{Float64})
+    n = length(data)
+    deriv = similar(data, Float64)
+    deriv[1] = 0.0
+    for i in 2:n
+        deriv[i] = data[i] - data[i-1]
+    end
+    return deriv
+end
+
 
 # 2. Exponential Moving Average (EMA)
 function ema_series(ticker::String, window::Int=14)
@@ -196,11 +206,13 @@ function get_all_features(ticker::String, day::Int, LOOK_BACK_PERIOD::Int=100)
 
     df.buy_sig = buy_sig
     df.sell_sig = sell_sig
+    df.buy_sig_deriv = derivative(buy_sig)
+    df.sell_sig_deriv = derivative(sell_sig)
 
     df.ema = ema_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  
     df.volume = volume_series(filepath_name)[LOOK_BACK_PERIOD+1:end]
     df.rsi = rsi_series(filepath_name)[LOOK_BACK_PERIOD+1:end]  
-    df.macd = macd_series(filepath_name)[LOOK_BACK_PERIOD+1:end] 
+    # df.macd = macd_series(filepath_name)[LOOK_BACK_PERIOD+1:end] 
     df.bb_percentb = bb_percentb_series_safe(filepath_name)[LOOK_BACK_PERIOD+1:end]
     # df.vwap = vwap_series(filepath_name)[LOOK_BACK_PERIOD+1:end] 
     sin_feat, cos_feat = time_of_day_features(filepath_name)

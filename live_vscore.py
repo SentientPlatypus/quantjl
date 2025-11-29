@@ -9,6 +9,9 @@ from alpaca.data.live.stock import StockDataStream
 from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest
 from alpaca.trading.enums import OrderSide, TimeInForce
+from alpaca.data.historical import StockHistoricalDataClient
+from alpaca.data.requests import StockBarsRequest
+from alpaca.data.timeframe import TimeFrame
 
 
 # ---------------------------------------------------------
@@ -149,6 +152,11 @@ class LiveVScoreEngine:
             paper=paper,
         )
 
+        self.data_client = StockHistoricalDataClient(
+            api_key,
+            secret_key,
+        )
+
         self.stream = StockDataStream(
             api_key=api_key,
             secret_key=secret_key,
@@ -267,6 +275,50 @@ class LiveVScoreEngine:
         # Optional: log current portfolio state
         self._log_state(t, price)
 
+    def preload_today_bars(self):
+        """Fill price_buffer with today's minute bars from market open to now."""
+        # Assuming US market, crude: 9:30 ET -> 13:30 UTC (ignore DST edge cases)
+        now_utc = datetime.now(timezone.utc)
+        start_utc = now_utc.replace(hour=14, minute=30, second=0, microsecond=0)
+
+        # If current time is before 13:30 UTC (pre-market), just skip
+        if now_utc <= start_utc:
+            print("Market not open yet (by this crude check); skipping preload.")
+            print("Current UTC time:", now_utc.isoformat())
+            print("START UTC time:", start_utc.isoformat())
+            start_utc -= timedelta(days=1)
+
+        req = StockBarsRequest(
+            symbol_or_symbols=self.symbol,
+            timeframe=TimeFrame.Minute,
+            start=start_utc,
+            end=now_utc,
+        )
+
+        print(f"Preloading bars for {self.symbol} from {start_utc} to {now_utc}...")
+        bars_resp = self.data_client.get_stock_bars(req)
+
+        # `bars_resp` can be accessed as a DataFrame via .df
+        df = bars_resp.df
+        if df.empty:
+            print("No historical bars returned for today; skipping preload.")
+            return
+
+        # If using multi-index (symbol, timestamp), select the symbol
+        if isinstance(df.index, pd.MultiIndex):
+            df = df.xs(self.symbol, level="symbol")
+
+        # Ensure sorted by time
+        df = df.sort_index()
+
+        # Fill the buffer with close prices, up to maxlen
+        for _, row in df.iterrows():
+            close_price = float(row["close"])
+            self.price_buffer.append(close_price)
+
+        print(f"Preloaded {len(self.price_buffer)} prices into buffer.")
+
+
     # -----------------------------------------------------
     # Run
     # -----------------------------------------------------
@@ -275,6 +327,8 @@ class LiveVScoreEngine:
         Start the websocket event loop and block.
         """
         print(f"Starting LiveVScoreEngine for {self.symbol}")
+        print("Preloading today's bars before live stream...")
+        self.preload_today_bars()
         print("Press Ctrl+C to stop.")
         try:
             self.stream.run()
@@ -296,7 +350,7 @@ def main():
             "Please set ALPACA_API_KEY and ALPACA_SECRET_KEY environment variables."
         )
 
-    symbol = "SPY"  # change to ASST / HIVE / etc. if you like
+    symbol = "DUOL"  # change to ASST / HIVE / etc. if you like
 
     engine = LiveVScoreEngine(
         api_key=api_key,

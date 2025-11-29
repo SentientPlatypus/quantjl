@@ -80,7 +80,8 @@ end
     nIndicators = ncol(month_features[1])
     
     π_ = Net([
-        Layer(nIndicators * LOOK_BACK_PERIOD + 1, 200, relu, relu′),
+        Layer(nIndicators * LOOK_BACK_PERIOD + 1, 300, relu, relu′),
+        Layer(300, 200, relu, relu′),
         Layer(200, 100, relu, relu′),
         Layer(100, 50, relu, relu′),
         Layer(50, 30, relu, relu′),
@@ -89,7 +90,8 @@ end
     ], mse_loss, mse_loss′)
 
     Q̂ = Net([
-        Layer(nIndicators * LOOK_BACK_PERIOD  + 2, 200, relu, relu′),
+        Layer(nIndicators * LOOK_BACK_PERIOD  + 2, 300, relu, relu′),
+        Layer(300, 200, relu, relu′),
         Layer(200, 100, relu, relu′),
         Layer(100, 50, relu, relu′),
         Layer(50, 30, relu, relu′),

@@ -20,7 +20,8 @@ function backtest_vscore_strategy(ticker::String;
         DateTime.(df.date)
     end
 
-    vscores = get_historical_vscores(ticker)
+    vscores = get_historical_vscores(ticker, 100, 5000, 20)
+    print("Latest 10 Vscores", vscores[end-9:end], "\n")
     n = min(length(prices), length(vscores))
 
     prices  = prices[end-n+1:end]
@@ -101,7 +102,9 @@ function backtest_vscore_strategy(ticker::String;
                  capital=capital, benchmark_capital=benchmark_capital)
 end
 
-TICKER = "SUIG"
+
+
+TICKER = "DUOL"
 backtest_asst() = backtest_vscore_strategy(TICKER)
 plt, results = backtest_asst()
 savefig(plt, "backtests/$(TICKER).png")

@@ -7,13 +7,13 @@ function returns(raw::Vector{Float64})
 end
 
 
-function vscore(raw::Vector{Float64}, OBS::Int=60, EPOCH::Int=1000, EXT::Int=20)
+function vscore(raw::Vector{Float64}, OBS::Int=60, EPOCH::Int=5000, EXT::Int=20)
     v = Float64[]  # Result vector
 
     for t in OBS:length(raw)-1
         temp = raw[t+1-OBS : t+1]
         ret = returns(temp)
-        s0 = temp[end]
+        s0 = temp[end] #raw value at time t
         μ, σ = mean(ret), std(ret)
         drift = μ + 0.5 * σ^2
 

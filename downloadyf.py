@@ -10,7 +10,8 @@ def download_minutes(ticker, interval="1m", period="7d", outfile=None, prepost=F
     period: up to "30d" for minute data
     """
     df = yf.download(ticker, interval=interval, period=period, prepost=prepost)
-
+    df.columns = df.columns.get_level_values(0)
+    print(df.columns)
     # Clean index to string timestamps
     df = df.reset_index()
     df.rename(columns={
@@ -39,6 +40,9 @@ def download_minutes(ticker, interval="1m", period="7d", outfile=None, prepost=F
 
 
 # Example usage
-df = download_minutes("SUIG", interval="1m", period="7d",
-                      outfile="data/SUIG.csv", prepost=True)
-print(df.head())
+if __name__ == "__main__":
+    import sys
+    ticker = sys.argv[1] if len(sys.argv) > 1 else "SPY"
+    df = download_minutes(ticker, interval="1m", period="7d",
+                        outfile=f"data/{ticker}.csv", prepost=True)
+    print(df.head())

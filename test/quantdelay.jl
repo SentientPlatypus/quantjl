@@ -1,0 +1,272 @@
+using Test
+using Random
+using UnicodePlots
+using Plots
+using Statistics
+
+include("../data.jl")
+include("../quant.jl")
+include("../data.jl")
+
+function calculate_better_reward(raw_return, capital, prev_capital, risk_window=20, prev_returns=Float64[], risk_aversion=0.1)
+    # Track the return
+    current_return = raw_return / prev_capital  # Percentage return
+    
+    # Risk component (using standard deviation if we have enough samples)
+    risk_penalty = 0.0
+    if length(prev_returns) >= risk_window
+        recent_returns = prev_returns[max(1, end-risk_window+1):end]
+        risk_penalty = risk_aversion * std(recent_returns)
+    end
+    
+
+    # Capital protection component - penalize being below initial capital
+    capital_penalty = 0.0
+    if capital < 1000.0
+        capital_penalty = 0.2 * (1000.0 - capital) / 1000.0
+    end
+    
+    # Final reward combines return minus risk and capital penalties
+    reward = current_return - risk_penalty - capital_penalty
+    
+    return reward
+end
+
+function benchmark_episode_reward(day_change, LOOK_BACK_PERIOD; initial_capital=1000.0)
+    current_capital = initial_capital
+    prev_capital = initial_capital
+    recent_returns = Float64[]
+    rewards = Float64[]
+
+    for t in LOOK_BACK_PERIOD:(length(day_change)-1)
+        percent_change = day_change[t+1]
+        market_return = current_capital * (percent_change / 100.0)
+        prev_capital = current_capital
+        current_capital += market_return
+
+        # use the same reward function as agent
+        raw_r = market_return
+        push!(recent_returns, raw_r / prev_capital)
+        if length(recent_returns) > 100
+            popfirst!(recent_returns)
+        end
+
+        better_r = calculate_better_reward(raw_r, current_capital, prev_capital,
+                                           20, recent_returns)
+
+        if better_r < 0.0
+            better_r *= 3
+        end
+
+        if current_capital < 950.0 || t == (length(day_change)-1)
+            extra_reward = 10 * (current_capital - 1000.0) / 1000.0
+            better_r += extra_reward
+        end
+
+        push!(rewards, better_r)
+    end
+
+    return mean(rewards)
+end
+
+@testset "DDPG" begin
+ 
+    Random.seed!(3)
+
+    ticker = "MSFT"
+    LOOK_BACK_PERIOD = 30    
+    NUM_EPISODES = 200
+    month_features, month_prices = get_month_features(ticker, 30,LOOK_BACK_PERIOD)
+    nIndicators = ncol(month_features[1])
+    
+    π_ = Net([
+        Layer(nIndicators * LOOK_BACK_PERIOD + 2, 300, relu, relu′),
+        Layer(300, 200, relu, relu′),
+        Layer(200, 100, relu, relu′),
+        Layer(100, 50, relu, relu′),
+        Layer(50, 30, relu, relu′),
+        Layer(30, 10, relu, relu′),
+        Layer(10, 1, sigmoid, sigmoid′)
+    ], mse_loss, mse_loss′)
+
+    Q̂ = Net([
+        Layer(nIndicators * LOOK_BACK_PERIOD  + 3, 300, relu, relu′),
+        Layer(300, 200, relu, relu′),
+        Layer(200, 100, relu, relu′),
+        Layer(100, 50, relu, relu′),
+        Layer(50, 30, relu, relu′),
+        Layer(30, 10, relu, relu′),
+        Layer(10, 1, idty, idty′)
+    ], mse_loss, mse_loss′)
+
+
+    println("STARTING TRAINING FOR $(ticker). Using features: $(names(month_features[1]))")
+
+    γ = 0.99
+    τ = 0.005
+    quant = Quant(π_, Q̂, γ, τ)
+
+    total_rewards = Float64[]
+    total_better_rewards = Float64[]
+    benchmark_rewards = Float64[]
+
+    ou_noise = OUNoise(θ=0.15, μ=0.0, σ=0.2, dt=1.0)
+    
+    
+    for i in 1:NUM_EPISODES
+
+        println("Episode: $i")
+
+        current_capital = 1000.0
+        episode_rewards = Float64[]
+        better_rewards = Float64[]
+        d = 0.0
+        episode_length = 0
+
+        # Track current allocation
+        current_market_allocation = 0.0
+        actions = []
+        capitals = [current_capital]
+        recent_returns = Float64[]
+        cooldown_steps = 10
+        last_trade_step  = -cooldown_steps
+        
+
+        day = rand(1:28)
+
+        day_features = month_features[day]
+        day_change = month_prices[day]
+        bench_r = benchmark_episode_reward(day_change, LOOK_BACK_PERIOD)
+        push!(benchmark_rewards, bench_r)
+        
+        for t in (LOOK_BACK_PERIOD):nrow(day_features) - 1
+            if d == 1.0
+                break
+            end
+    
+            episode_length += 1
+
+            cooldown_remaining = max(0, cooldown_steps - (t - last_trade_step))
+            cooldown_feature = cooldown_remaining / cooldown_steps  # in [0,1]
+
+            s = vcat(
+                [day_features[!, col][t - LOOK_BACK_PERIOD + 1:t] for col in names(day_features)]...,
+                [cooldown_feature],
+                [current_market_allocation],
+            )    
+
+            # Generate action (target allocation)
+            ε = sample!(ou_noise)
+            ou_noise.σ = max(0.05, ou_noise.σ * exp(-0.00005))
+
+            a = quant.π_(s)[1]
+            push!(actions, a)
+
+            a_noisy = clamp(a + ε, 0, 1)
+            can_trade = (t - last_trade_step) >= cooldown_steps
+
+            if can_trade
+                target_allocation = a_noisy
+            else
+                target_allocation = current_market_allocation
+            end
+
+            # Calculate change in allocation
+            allocation_change = target_allocation - current_market_allocation
+
+            trade_happened = abs(allocation_change) > 1e-6
+
+            if trade_happened && can_trade
+                last_trade_step = t
+            end
+            
+            # Apply market impact/transaction costs (optional)
+            transaction_cost = 0.0002 * abs(allocation_change) * current_capital
+            current_capital -= transaction_cost
+            
+            # Record capital before market moves
+            prev_capital = current_capital
+            
+            # Apply market movement to existing allocation
+            current_market_allocation = target_allocation
+
+            percent_change = day_change[t + 1]
+            market_return = current_market_allocation * current_capital * (percent_change / 100.0)
+            current_capital += market_return
+
+            raw_r = market_return - transaction_cost
+            
+            push!(recent_returns, raw_r / prev_capital)  # Store return as percentage
+
+            if length(recent_returns) > 100
+                popfirst!(recent_returns)
+            end
+
+            better_r = calculate_better_reward(raw_r, current_capital, prev_capital, 20, recent_returns)
+            if better_r < 0.0
+                better_r *= 0.75
+            end
+
+            push!(capitals, current_capital)
+    
+            cooldown_remaining_next = max(0, cooldown_steps - ((t+1) - last_trade_step))
+            cooldown_feature_next = cooldown_remaining_next / cooldown_steps
+
+            s′ = vcat(
+                [day_features[!, col][t - LOOK_BACK_PERIOD + 2:t+1] for col in names(day_features)]...,
+                [cooldown_feature_next],
+                [current_market_allocation]
+            )
+
+            push!(episode_rewards, raw_r)
+
+            if current_capital < 950.0 || t == nrow(day_features) - 1
+                d = 1.0
+                extra_reward = 15 * (current_capital - 1000.0) / 1000.0
+                better_r += extra_reward
+            end
+
+            push!(better_rewards, better_r)
+    
+            add_experience!(quant, s, target_allocation, better_r, s′, d)
+            train!(quant, 3e-4, 5e-5, 0.0001, 256)
+
+        end
+        
+        if i % 20 == 0 || i == 1
+            # Compute benchmark capital over the same episode length
+            benchmark_capital_traj = 1000 * cumprod(1 .+ day_change[LOOK_BACK_PERIOD:LOOK_BACK_PERIOD + episode_length] ./ 100)
+
+            # Plot agent's capital trajectory
+            capital_plot = plot(capitals, title="Episode $i Capital over time", 
+                xlabel="Time", ylabel="Capital", label="Agent", lw=1)
+
+            # Overlay benchmark trajectory (Buy & Hold)
+            plot!(capital_plot, benchmark_capital_traj, label="Benchmark (Buy & Hold)", linestyle=:dash, color=:red, lw=1)
+            
+            action_plot = plot(actions, title="Actions over time", xlabel="Time", ylabel="Action", label="Actions", lw=1)
+
+            final_plot = plot(capital_plot, action_plot, layout=(2,1), size=(800,600))
+            # Save the figure
+
+            date_str = Dates.format(now(), "yyyy-mm-dd")
+            save_dir = "plots/capital_distribution/$(date_str)"
+            mkpath(save_dir)
+            Plots.savefig("$(save_dir)/episode_$(i).png")
+        end
+
+        push!(total_rewards, mean(episode_rewards))
+        push!(total_better_rewards, mean(better_rewards))
+    end 
+    
+    Plots.savefig("plots/capital_distribution/episodes_full.png")
+    plt = Plots.plot(1:NUM_EPISODES, benchmark_rewards, xlabel="Episode", ylabel="total reward", title="total episodic reward for DDPG Agent. $(ticker)", color=:red, lw=1, label="Benchmark (Buy & Hold)")
+
+
+    plot!(plt, 1:NUM_EPISODES, total_rewards,
+        label="Agent", color=:blue, lw=1)
+    Plots.savefig("plots/total_rewards.png")
+
+    better_r = Plots.plot(1:NUM_EPISODES, total_better_rewards, xlabel="Episode", ylabel="better reward", title="DDPG Better Reward Training")
+    Plots.savefig("plots/better_rewards.png")
+end
