@@ -8,14 +8,14 @@
 ![alt text](plots/gbm_path_full.png)
 ## Introduction
 
-QuantJL is a sophisticated algorithmic trading system that uses Deep Deterministic Policy Gradient (DDPG) reinforcement learning to optimize stock trading strategies. The system learns to make optimal trading decisions by analyzing high-frequency market data and technical indicators to maximize return on investment while managing risk.
+QuantJL is a sophisticated algorithmic trading system that uses Deep Deterministic Policy Gradient (DDPG) reinforcement learning to optimize stock trading strategies. The system learns to make optimal trading decisions by analyzing minute-level intraday market data and technical indicators to maximize return on investment while managing risk.
 
 ### Problem Statement
 
 Traditional trading strategies often rely on static rules or simple technical indicators that fail to adapt to changing market conditions. QuantJL addresses this by implementing a continuous control reinforcement learning agent that learns optimal trading policies through interaction with market data. The agent determines whether to **hold (0)** or **long (1)** positions based on the state of the market over the last 20 minutes of multiple technical indicators.
 
 ### Results
-Unfortunately, the average reward from each episode seems to plateau at around -0.01 cents, which I believe to be largely due to transaction costs. This behavior is consistent with high-frequency environments in which transaction costs dominate per-timestep returns. Because the RL agent must output an action every single minute, even small position adjustments generate cumulative friction that overwhelms micro-profits.
+Unfortunately, the average reward from each episode seems to plateau at around -0.01 cents, which I believe to be largely due to transaction costs. This behavior is consistent with minute-level intraday environments in which transaction costs dominate per-timestep returns. Because the RL agent must output an action every single minute, even small position adjustments generate cumulative friction that overwhelms micro-profits.
 ![alt text](total_rewards_nice_graph.png)
 
 However, the brownian motion indicator later discussed the **vscore formulation** part of this readme, shows promise, as the movement of an asset changes direction after a critical value. For example, we take a long position on an asset if the vscore goes below -2, and sell it after it goes above +2. The following is one of many example backtests done on this strategy.
@@ -31,7 +31,7 @@ This throttling drastically reduces transaction costs and prevents repeated osci
 ## Key Features
 
 - **Deep Deterministic Policy Gradient (DDPG)** implementation for continuous action spaces
-- **High-frequency trading** support with minute-level data processing
+- **minute-level intraday trading** support with minute-level data processing
 - **Custom technical indicators** including V-scores, RSI, EMA, MACD, Bollinger Bands, and VWAP
 - **Risk management** with volatility penalties and capital protection mechanisms
 - **Experience replay** with prioritized sampling for stable learning
@@ -315,7 +315,7 @@ PLOTS_DIR=./plots
 ### Download Market Data
 
 ```bash
-# Download high-frequency data for Microsoft (MSFT) for the past 30 days
+# Download minute-level intraday data for Microsoft (MSFT) for the past 30 days
 python download.py MSFT
 ```
 
@@ -404,7 +404,7 @@ batch_size = 64   # Training batch size
 
 ### Data Sources
 
-- **Financial Modeling Prep API**: High-frequency (1-minute) and historical data
+- **Financial Modeling Prep API**: minute-level intraday (1-minute) and historical data
 - **Supported tickers**: MSFT, AAPL, NVDA, PLTR, SPY, and more
 - **Data format**: CSV files with OHLCV data and calculated percentage changes
 
@@ -413,7 +413,7 @@ batch_size = 64   # Training batch size
 ```
 data/
 ├── 2025-06-14/          # Date-based directories
-│   ├── MSFT_day1.csv    # Daily high-frequency data
+│   ├── MSFT_day1.csv    # Daily minute-level intraday data
 │   ├── MSFT_day2.csv
 │   └── ...
 ├── MSFT.csv             # Historical data
@@ -427,7 +427,7 @@ data/
 # Download historical data
 python download.py MSFT AAPL NVDA
 
-# Download high-frequency data for past 30 days
+# Download minute-level intraday data for past 30 days
 python download.py MSFT
 ```
 
@@ -534,7 +534,7 @@ Training generates several visualization files:
 
 - **Training Time**: Full training can take several hours on CPU
 - **Memory Requirements**: Requires sufficient RAM for replay buffer
-- **Data Storage**: High-frequency data requires significant disk space
+- **Data Storage**: minute-level intraday data requires significant disk space
 
 ## Roadmap
 - [ ] **Short Selling Support**: Extend action space to include short positions (-1)
