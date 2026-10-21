@@ -12,16 +12,16 @@ QuantJL is a sophisticated algorithmic trading system that uses Deep Determinist
 
 ### Problem Statement
 
-Traditional trading strategies often rely on static rules or simple technical indicators that fail to adapt to changing market conditions. QuantJL addresses this by implementing a continuous control reinforcement learning agent that learns optimal trading policies through interaction with market data. The agent determines whether to **hold (0)** or **long (1)** positions based on the state of the market over the last 20 minutes of multiple technical indicators.
+Traditional trading strategies often rely on static rules or simple technical indicators that fail to adapt to changing market conditions. QuantJL addresses this by implementing a continuous control reinforcement learning agent that learns optimal trading policies through interaction with market data. The agent determines whether to **hold (0)** or **long (1)** positions based on the state of the market over the last 30 minutes of 10 features (V-score signals, technical indicators and time of day).
 
 ### Results
 Unfortunately, the average reward from each episode seems to plateau at around -0.01 cents, which I believe to be largely due to transaction costs. This behavior is consistent with minute-level intraday environments in which transaction costs dominate per-timestep returns. Because the RL agent must output an action every single minute, even small position adjustments generate cumulative friction that overwhelms micro-profits.
 ![alt text](total_rewards_nice_graph.png)
 
-However, the brownian motion indicator later discussed the **vscore formulation** part of this readme, shows promise, as the movement of an asset changes direction after a critical value. For example, we take a long position on an asset if the vscore goes below -2, and sell it after it goes above +2. The following is one of many example backtests done on this strategy.
+However, the brownian motion indicator later discussed the **vscore formulation** part of this readme, shows promise, as the movement of an asset changes direction after a critical value. For example, the backtest (`test/gbm_backtest.jl`) takes a long position (all-in) when the vscore goes below -2.0 and sells (all-out) when it goes above 1.72. The following is one of many example backtests done on this strategy.
 ![alt text](backtests/SUIG.png)
 
-**However**, the backtests enforce a **trade-cooldown of ten minutes** while the reinforcement learning algorithm does not. 
+**However**, the backtests enforce a **trade-cooldown of 30 minutes** while the reinforcement learning algorithm does not. 
 This throttling drastically reduces transaction costs and prevents repeated oscillation around the threshold. Consequently:
 
 * The strategy trades only when the signal is strong,
@@ -32,9 +32,9 @@ This throttling drastically reduces transaction costs and prevents repeated osci
 
 - **Deep Deterministic Policy Gradient (DDPG)** implementation for continuous action spaces
 - **minute-level intraday trading** support with minute-level data processing
-- **Custom technical indicators** including V-scores, RSI, EMA, MACD, Bollinger Bands, and VWAP
+- **Custom technical indicators** including V-score signals, RSI, EMA, Bollinger %B, volume and time-of-day encodings (MACD and VWAP are implemented in `data.jl` but not used in the state)
 - **Risk management** with volatility penalties and capital protection mechanisms
-- **Experience replay** with prioritized sampling for stable learning
+- **Experience replay** (10,000-transition FIFO buffer, uniform sampling)
 - **Target networks** for stable training with soft updates
 - **Ornstein-Uhlenbeck noise** for exploration during training
 - **Comprehensive visualization** tools for monitoring training progress
@@ -45,7 +45,7 @@ QuantJL implements a Deep Deterministic Policy Gradient (DDPG) algorithm, a mode
 
 ### Core Components
 
-**Actor Network (π)**: A deterministic policy network that maps market states to trading actions. The network takes as input the last 20 minutes of technical indicators plus current capital and outputs a continuous action value between 0 and 1 (hold to long).
+**Actor Network (π)**: A deterministic policy network that maps market states to trading actions. The network takes as input the last 30 minutes of 10 features plus the current market allocation and outputs a continuous action value between 0 and 1 (hold to long).
 
 **Critic Network (Q)**: A Q-value network that evaluates state-action pairs. It takes both the market state and the action as input and outputs the expected return for that state-action combination.
 
@@ -127,17 +127,29 @@ $$\theta_{\pi'} \leftarrow \tau \theta_{\pi} + (1-\tau) \theta_{\pi'}$$
 
 The state representation combines multiple technical indicators:
 
-$$s_t = [v_{t-19:t}, c_t] \in \mathbb{R}^{101}$$
+$$s_t = [f^{(1)}_{t-29:t}, \dots, f^{(10)}_{t-29:t}, \text{alloc}_t] \in \mathbb{R}^{301}$$
 
-Where:
-- $v_{t-19:t}$: V-scores for the last 20 minutes (100 dimensions)
-- $c_t$: Log-transformed current capital (1 dimension)
+Each of the 10 feature columns from `get_all_features` (`data.jl`) contributes its last 30 values (`LOOK_BACK_PERIOD = 30`), concatenated column by column, followed by the current market allocation (1 dimension): 10 × 30 + 1 = 301. The next state $s'$ is the same window shifted forward by one bar.
+
+The 10 features, in order:
+1. `buy_sig` = max(0, −1.5 − V)
+2. `sell_sig` = max(0, V − 1.5)
+3. `buy_sig_deriv`: first difference of `buy_sig`
+4. `sell_sig_deriv`: first difference of `sell_sig`
+5. `ema`: 14-period EMA of close (z-standardized over the day)
+6. `volume`: log base 1000 of (volume + 1)
+7. `rsi`: 14-period RSI (z-standardized over the day)
+8. `bb_percentb`: Bollinger %B (20-period, 2σ)
+9. `sin_feat` = sin(2π · minute / 420)
+10. `cos_feat` = cos(2π · minute / 420)
+
+Here *minute* is hour × 60 + minute of the bar's timestamp. Only `rsi` and `ema` are standardized.
 
 ### Action Space
 
-Continuous action space representing position sizing:
+Continuous action space representing position sizing. The actor's sigmoid output $a_t$ is perturbed by Ornstein-Uhlenbeck noise (θ = 0.15, μ = 0, σ = 0.2, dt = 1; σ decays each step as σ ← max(0.05, σ·e^{−0.00005})) and clipped to give the target allocation:
 
-$$a_t \in [0, 1]$$
+$$\text{alloc}_t = \text{clip}(a_t + \varepsilon_t, 0, 1)$$
 
 Where:
 - $a_t = 0$: Hold (no position)
@@ -145,17 +157,25 @@ Where:
 
 ### Reward Function
 
-The reward function incorporates multiple risk management components:
+Each step (`test/quantposgbm.jl`) first charges a transaction cost on the allocation change, then applies the next bar's percent price change:
 
 $$
-r_t = \text{rawReturn}_t - \text{riskPenalty}_t - \text{capitalPenalty}_t
+\text{cost}_t = 0.0002 \cdot |\text{alloc}_t - \text{alloc}_{t-1}| \cdot \text{capital}
 $$
 $$
-\text{rawReturn}_t = a_t \cdot \text{capitalAllocation}_t \cdot
-\frac{\text{priceChange}_t}{100}
+\text{marketReturn}_t = \text{alloc}_t \cdot \text{capital}_t \cdot \frac{\text{priceChange}_{t+1}}{100}
 $$
 $$
-\text{riskPenalty}_t = \lambda_{\text{risk}} \cdot \sigma(\text{recentReturns})
+\text{rawReturn}_t = \text{marketReturn}_t - \text{cost}_t
+$$
+
+The reward fed to the agent incorporates multiple risk management components:
+
+$$
+r_t = \frac{\text{rawReturn}_t}{\text{prevCapital}_t} - \text{riskPenalty}_t - \text{capitalPenalty}_t
+$$
+$$
+\text{riskPenalty}_t = 0.1 \cdot \text{std}(\text{last 20 returns})
 $$
 $$
 \text{capitalPenalty}_t =
@@ -165,6 +185,8 @@ $$
 \end{cases}
 $$
 
+Negative rewards are scaled by 0.75. An episode (one random trading day, starting capital 1000) ends when capital falls below 950 or the day ends; the final step adds a terminal bonus of $15 \cdot (\text{capital} - 1000)/1000$. Episodes are compared to a buy-and-hold benchmark.
+
 **Key Insight**: During initial experiments, when trading penalties were set too high, the actor network learned to avoid making any movements whatsoever, effectively learning a "do nothing" policy. This highlights the importance of carefully balancing risk penalties with trading incentives to encourage active learning while maintaining risk management.
 
 ### V-Score Mathematical Formulation
@@ -172,24 +194,30 @@ $$
 The V-score is a custom volatility indicator based on Monte Carlo simulation of Geometric Brownian Motion (GBM):
 
 **GBM Process**:
-$$S_{t+\Delta t} = S_t \exp\left(\left(\mu - \frac{\sigma^2}{2}\right)\Delta t + \sigma \sqrt{\Delta t} \cdot Z\right)$$
+For each time $t$, `vscore` in `gbm.jl` takes the last OBS prices, computes their simple returns, and sets $\mu$ = mean and $\sigma$ = std of those returns. It then simulates EPOCH paths of EXT steps from the current price $s_0$, with $\Delta t$ = 1 bar:
+
+$$S_k = s_0 \exp\left(\left(\mu + \frac{\sigma^2}{2}\right)k + \sigma \sum_{j=1}^{k} Z_j\right), \quad k = 1,\dots,\text{EXT}$$
 
 Where:
-- $S_t$: Current stock price
-- $\mu$: Drift parameter (estimated from historical returns)
-- $\sigma$: Volatility parameter (estimated from historical returns)
-- $Z \sim \mathcal{N}(0,1)$: Standard normal random variable
+- $s_0$: Current stock price
+- $\mu$, $\sigma$: Mean and standard deviation of the window's simple returns
+- $Z_j \sim \mathcal{N}(0,1)$: Standard normal random variables
 
-**V-Score Calculation**:
-$$V_t = \frac{\text{count}(\text{simulatedPaths} > S_t) - \text{expectedCount}}
-           {\text{std}(\text{countDistribution})}$$
+Note the drift in the code is $\mu + \frac{\sigma^2}{2}$ and there is no $\sqrt{\Delta t}$ factor, since each step is one bar.
 
+**V-Score Calculation**: the raw score is the fraction of all simulated path points (every path, every step) above $s_0$:
 
-The V-score represents how many simulated future paths exceed the current price, normalized by the distribution's standard deviation.
+$$v_t = \frac{\text{count}(S_{i,k} > s_0)}{\text{EPOCH} \cdot \text{EXT}}$$
+
+The raw series is then z-scored over the **whole series** (not a rolling window):
+
+$$V_t = \frac{v_t - \text{mean}(v)}{\text{std}(v)}$$
+
+Defaults as called: feature pipeline OBS = 100 (passed as `LOOK_BACK_PERIOD`), EPOCH = 1000, EXT = 20; backtest OBS = 100, EPOCH = 5000, EXT = 20. The RL features use thresholds of ±1.5 (`buy_sig`, `sell_sig`), while the backtest buys below −2.0 and sells above 1.72.
 
 ### Key DDPG Aspects
 
-**State Representation**: The state space combines temporal market information (V-scores) with current capital position, providing the agent with both market context and portfolio state information.
+**State Representation**: The state space combines 30 minutes of 10 market features (V-score signals, indicators, time of day) with the current market allocation, providing the agent with both market context and portfolio state information.
 
 **Action Space**: Continuous actions allow for nuanced position sizing rather than discrete buy/sell decisions, enabling more sophisticated trading strategies.
 
@@ -326,7 +354,7 @@ python download.py MSFT
 julia
 
 # Include the main training script
-include("test/quantgbm.jl")
+include("test/quantposgbm.jl")
 ```
 
 ### Minimal Example
@@ -339,25 +367,30 @@ include("data.jl")
 # Set random seed for reproducibility
 Random.seed!(3)
 
-# Create neural networks
-π_ = Net([Layer(101, 80, relu, relu′),
-          Layer(80, 64, relu, relu′),
-          Layer(64, 32, relu, relu′),
-          Layer(32, 16, relu, relu′),
-          Layer(16, 1, idty, idty′)], mse_loss, mse_loss′)
+# Create neural networks (state = 10 features × 30 lookback + allocation = 301)
+nIndicators, LOOK_BACK_PERIOD = 10, 30
+π_ = Net([Layer(nIndicators * LOOK_BACK_PERIOD + 1, 300, relu, relu′),
+          Layer(300, 200, relu, relu′),
+          Layer(200, 100, relu, relu′),
+          Layer(100, 50, relu, relu′),
+          Layer(50, 30, relu, relu′),
+          Layer(30, 10, relu, relu′),
+          Layer(10, 1, sigmoid, sigmoid′)], mse_loss, mse_loss′)
 
-Q̂ = Net([Layer(102, 80, relu, relu′),
-         Layer(80, 64, relu, relu′),
-         Layer(64, 32, relu, relu′),
-         Layer(32, 16, relu, relu′),
-         Layer(16, 1, idty, idty′)], mse_loss, mse_loss′)
+Q̂ = Net([Layer(nIndicators * LOOK_BACK_PERIOD + 2, 300, relu, relu′),
+         Layer(300, 200, relu, relu′),
+         Layer(200, 100, relu, relu′),
+         Layer(100, 50, relu, relu′),
+         Layer(50, 30, relu, relu′),
+         Layer(30, 10, relu, relu′),
+         Layer(10, 1, idty, idty′)], mse_loss, mse_loss′)
 
 # Initialize DDPG agent
-quant = Quant(π_, Q̂, 0.95, 0.009)
+quant = Quant(π_, Q̂, 0.99, 0.005)
 
 # Get market data
 price_data = get_historical("MSFT")
-vscores = get_historical_vscores("MSFT")
+vscores = get_historical_vscores("MSFT")   # OBS=100, EPOCH=1000, EXT=20
 
 # Training loop (simplified)
 for episode in 1:100
@@ -372,19 +405,9 @@ end
 The default network configuration can be modified in the test files:
 
 ```julia
-# Actor network: 101 → 80 → 64 → 32 → 16 → 1
-π_ = Net([Layer(101, 80, relu, relu′),
-          Layer(80, 64, relu, relu′),
-          Layer(64, 32, relu, relu′),
-          Layer(32, 16, relu, relu′),
-          Layer(16, 1, idty, idty′)], mse_loss, mse_loss′)
-
-# Critic network: 102 → 80 → 64 → 32 → 16 → 1
-Q̂ = Net([Layer(102, 80, relu, relu′),
-         Layer(80, 64, relu, relu′),
-         Layer(64, 32, relu, relu′),
-         Layer(32, 16, relu, relu′),
-         Layer(16, 1, idty, idty′)], mse_loss, mse_loss′)
+# Actor network: 301 → 300 → 200 → 100 → 50 → 30 → 10 → 1 (ReLU, sigmoid output)
+# Critic network: 302 → 300 → 200 → 100 → 50 → 30 → 10 → 1 (ReLU, identity output)
+# See test/quantposgbm.jl and the Minimal Example above for the full definitions.
 ```
 
 ### Training Parameters
@@ -392,12 +415,13 @@ Q̂ = Net([Layer(102, 80, relu, relu′),
 Key hyperparameters can be adjusted:
 
 ```julia
-γ = 0.95          # Discount factor
-τ = 0.009         # Target network update rate
-α_Q = 0.0001      # Critic learning rate
-α_π = 0.0001      # Actor learning rate
-λ = 64            # Regularization parameter
-batch_size = 64   # Training batch size
+γ = 0.99          # Discount factor
+τ = 0.005         # Target network update rate
+α_Q = 3e-4        # Critic learning rate
+α_π = 5e-5        # Actor learning rate
+λ = 1e-4          # Regularization parameter
+batch_size = 256  # Training batch size
+# called as train!(quant, 3e-4, 5e-5, 0.0001, 256)
 ```
 
 ## Data & Preprocessing
@@ -435,13 +459,14 @@ python download.py MSFT
 
 The system calculates multiple technical indicators:
 
-- **V-Scores**: Custom volatility scoring using Monte Carlo simulation
+- **V-Score signals**: `buy_sig`/`sell_sig` (±1.5 thresholds) and their first differences
 - **RSI**: Relative Strength Index (14-period)
 - **EMA**: Exponential Moving Average (14-period)
-- **MACD**: Moving Average Convergence Divergence
-- **Bollinger Bands %B**: Bollinger Band position indicator
-- **VWAP**: Volume Weighted Average Price
-- **Time-of-day features**: Cyclical encoding of trading hours
+- **Bollinger Bands %B**: Bollinger Band position indicator (20-period, 2σ)
+- **Volume**: log base 1000 of (volume + 1)
+- **Time-of-day features**: sin/cos encoding with a 420-minute period
+
+`data.jl` also implements MACD and VWAP, but they are commented out of `get_all_features` and are not part of the state.
 
 ## Training
 
@@ -449,16 +474,18 @@ The system calculates multiple technical indicators:
 
 ```julia
 # Run the main training script
-include("test/quantgbm.jl")
+include("test/quantposgbm.jl")
 ```
 
 ### Training Configuration
 
 ```julia
-LOOK_BACK_PERIOD = 100    # Number of historical data points
-NUM_EPISODES = 200        # Training episodes
+Random.seed!(3)
+ticker = "ASST"
+LOOK_BACK_PERIOD = 30     # Minutes of history per feature in the state
+NUM_EPISODES = 200        # Training episodes (one random day each)
 INITIAL_CAPITAL = 1000.0  # Starting capital
-MIN_CAPITAL = 650.0       # Episode termination threshold
+MIN_CAPITAL = 950.0       # Episode termination threshold
 ```
 
 
@@ -496,7 +523,7 @@ To reproduce the published results:
 Random.seed!(3)
 
 # Use default configuration
-include("test/quantgbm.jl")
+include("test/quantposgbm.jl")
 
 # Results will be saved to plots/ directory
 ```
@@ -539,7 +566,6 @@ Training generates several visualization files:
 ## Roadmap
 - [ ] **Short Selling Support**: Extend action space to include short positions (-1)
 - [ ] **Multi-Asset Training**: Implement portfolio-level optimization
-- [ ] **Transaction Costs**: Add realistic trading costs to reward function
 - [ ] **Hyperparameter Optimization**: Automated hyperparameter tuning
 - [ ] **GPU Support**: CUDA acceleration for faster training
 
